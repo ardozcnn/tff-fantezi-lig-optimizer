@@ -1,6 +1,6 @@
 # TFF Fantezi Lig Takım Öneri Aracı
 
-Süper Lig formu, TFF fiyatları ve dış lig istatistiklerini birleştirerek **100M / 15'li** kadro önerir. Diziliş (4-4-2, 4-5-1, 3-4-3 …), ilk 11, yedekler ve kaptan otomatik seçilir.
+TFF fiyatları ve dış lig istatistiklerini birleştirerek **100M / 15'li** kadro önerir. Diziliş (4-4-2, 4-5-1, 3-4-3 …), ilk 11, yedekler ve kaptan otomatik seçilir.
 
 ## Hızlı başlangıç
 
@@ -16,7 +16,7 @@ calistir.bat
 
 ## Giriş dosyası
 
-`data/tff_login.txt` (git'e eklenmez):
+`data/tff_login.txt`:
 
 ```
 email=senin@mail.com
