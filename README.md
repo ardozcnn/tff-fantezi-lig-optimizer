@@ -76,10 +76,6 @@ python calibrate_leagues.py
 | Kadro | 2 GK, 5 DF, 5 MF, 3 FW |
 | Aynı takım | en fazla 3 |
 
-## Güvenlik
-
-`data/tff_login.txt`, `data/tff_cookies.txt`, `data/prices.csv` ve `data/cache/` **commit edilmemeli** (`.gitignore` içinde).
-
 ## Uyarı
 
 Bu araç resmî TFF uygulaması değildir; öneri amaçlıdır.
