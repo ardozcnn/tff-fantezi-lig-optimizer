@@ -459,6 +459,14 @@ def parse_tff_official_players(data: Any, clubs: dict[int, str] | None = None) -
                 "selected_by": p.get("selectedByPct") or 0,
                 "tff_xg": p.get("xGTotal") or 0,
                 "tff_xa": p.get("xATotal") or 0,
+                "tff_points": p.get("totalPoints") or 0,
+                "tff_ppm": p.get("pointsPerMatch") or 0,
+                "tff_minutes": p.get("minutes") or 0,
+                "tff_starts": p.get("starts") or 0,
+                "tff_goals": p.get("goals") or 0,
+                "tff_assists": p.get("assists") or 0,
+                "tff_bonus": p.get("bonus") or 0,
+                "tff_bps": p.get("bps") or 0,
             }
         )
     if not rows:
@@ -831,6 +839,14 @@ def save_prices_csv(df: pd.DataFrame, path: str | Path) -> None:
             "selected_by",
             "tff_xg",
             "tff_xa",
+            "tff_points",
+            "tff_ppm",
+            "tff_minutes",
+            "tff_starts",
+            "tff_goals",
+            "tff_assists",
+            "tff_bonus",
+            "tff_bps",
         )
         if c in out.columns
     ]

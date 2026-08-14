@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import pandas as pd
@@ -17,7 +18,6 @@ from .config import (
     KEYPASS_TO_ASSIST,
     LOW_SAMPLE_MULT,
     MIN_60_POINTS,
-    MIN_APPS_FOR_CURRENT_BASE,
     MIN_FULL_POINTS,
     NEW_SIGNING_MULT,
     OWN_GOAL_PENALTY,
@@ -198,16 +198,26 @@ def _blend_attack(actual_pa: float, expected_pa: float, proxy_pa: float = 0.0) -
 
 
 def _bonus_from_rating(rating: float) -> float:
-    """Maçın en iyi 3'ü: 3/2/1. Rating yüksekse bonus beklenir."""
-    if rating >= 7.8:
-        return 1.15
-    if rating >= 7.3:
-        return 0.70
-    if rating >= 6.9:
-        return 0.35
-    if rating >= 6.5:
-        return 0.12
-    return 0.04
+    """Sofa rating yalnızca BPS vekilidir; etkisi sınırlı ve yumuşak tutulur."""
+    if rating <= 6.4:
+        return 0.03
+    return min(0.80, 0.45 * (rating - 6.4))
+
+
+def _expected_concede_penalty(goals_conceded: float) -> float:
+    """Poisson yaklaşımıyla E[floor(yenen gol / 2)]."""
+    lam = max(0.0, float(goals_conceded or 0.0))
+    if lam <= 0:
+        return 0.0
+    probability = math.exp(-lam)
+    expected = 0.0
+    for goals in range(1, 13):
+        if goals > 1:
+            probability *= lam / goals
+        else:
+            probability = math.exp(-lam) * lam
+        expected += (goals // 2) * probability
+    return expected
 
 
 def expected_points_from_rates(
@@ -217,6 +227,7 @@ def expected_points_from_rates(
     *,
     appearance: float | None = None,
     attack_mult: float = 1.0,
+    cs_mult: float = 1.0,
 ) -> float:
     """Bir maçlık beklenen TFF fantezi puanı (dakika, xG/xA, CS, kart, bonus, penaltı)."""
     if not rates or rates.get("apps", 0) <= 0:
@@ -243,16 +254,23 @@ def expected_points_from_rates(
         rates.get("xa_pa") or 0.0,
         max(kp_proxy, bcc_proxy),
     )
-    goal_pts = exp_gls * GOAL_POINTS[pos] * attack_mult
-    assist_pts = exp_ast * ASSIST_POINTS * attack_mult
+    # Bütün olay oranları "oynadığı maç başına"; önce oynama olasılığıyla çarpılır.
+    goal_pts = appearance * exp_gls * GOAL_POINTS[pos] * attack_mult
+    assist_pts = appearance * exp_ast * ASSIST_POINTS * attack_mult
 
     cs_rate = team_cs_rate if team_cs_rate is not None else rates.get("cs_rate", 0.0)
+    cs_rate = max(0.0, min(1.0, cs_rate * cs_mult))
     if pos in ("GK", "DF"):
-        cs_pts = cs_rate * share_60 * CS_POINTS[pos]
+        cs_pts = appearance * cs_rate * share_60 * CS_POINTS[pos]
         ga_pa = rates.get("ga_pa") or (1.0 - cs_rate) * 1.2
-        concede_pen = (ga_pa / 2.0) * CONCEDED_PENALTY_PER_2 * share_60
+        concede_pen = (
+            appearance
+            * _expected_concede_penalty(ga_pa)
+            * CONCEDED_PENALTY_PER_2
+            * share_60
+        )
     elif pos == "MF":
-        cs_pts = cs_rate * share_60 * CS_POINTS["MF"]
+        cs_pts = appearance * cs_rate * share_60 * CS_POINTS["MF"]
         concede_pen = 0.0
     else:
         cs_pts = 0.0
@@ -260,12 +278,15 @@ def expected_points_from_rates(
 
     save_pts = 0.0
     if pos == "GK":
-        save_pts = (rates.get("saves_pa", 0.0) / 3.0) * SAVE_POINTS_PER_3
-        save_pts += (rates.get("pen_save_pa") or 0.0) * PENALTY_SAVE_POINTS
+        save_pts = appearance * (rates.get("saves_pa", 0.0) / 3.0) * SAVE_POINTS_PER_3
+        save_pts += appearance * (rates.get("pen_save_pa") or 0.0) * PENALTY_SAVE_POINTS
 
-    card_pen = rates.get("yc_pa", 0.0) * YELLOW_PENALTY + rates.get("rc_pa", 0.0) * RED_PENALTY
-    pen_miss = (rates.get("pen_miss_pa") or 0.0) * PENALTY_MISS_PENALTY
-    og_pen = (rates.get("og_pa") or 0.0) * OWN_GOAL_PENALTY
+    card_pen = appearance * (
+        rates.get("yc_pa", 0.0) * YELLOW_PENALTY
+        + rates.get("rc_pa", 0.0) * RED_PENALTY
+    )
+    pen_miss = appearance * (rates.get("pen_miss_pa") or 0.0) * PENALTY_MISS_PENALTY
+    og_pen = appearance * (rates.get("og_pa") or 0.0) * OWN_GOAL_PENALTY
     bonus = appearance * _bonus_from_rating(rates.get("rating") or 0.0)
 
     return float(
@@ -295,6 +316,38 @@ def blend_weights(form_apps: float) -> tuple[float, float]:
     return W_FORM_DEFAULT, W_BASE_DEFAULT
 
 
+def _recency_multiplier(form_apps: float, form_matches: float) -> float:
+    recent_matches = max(1.0, float(form_matches or 0))
+    recent_presence = min(1.0, max(0.0, form_apps) / recent_matches)
+    return 0.65 + 0.35 * recent_presence
+
+
+def _blend_rate_sets(
+    current: dict[str, float],
+    previous: dict[str, float],
+    current_apps: float,
+    *,
+    prior_matches: float = 5.0,
+) -> tuple[dict[str, float], float]:
+    """Az mevcut sezon örneğini silmek yerine önceki sezonla küçültür."""
+    if current.get("apps", 0) <= 0:
+        return previous.copy(), 0.0
+    if previous.get("apps", 0) <= 0:
+        return current.copy(), 1.0
+
+    weight = max(0.0, min(1.0, current_apps / (current_apps + prior_matches)))
+    out: dict[str, float] = {}
+    for key in current:
+        if key in ("apps", "apps_60"):
+            continue
+        out[key] = weight * float(current.get(key, 0.0)) + (1.0 - weight) * float(
+            previous.get(key, 0.0)
+        )
+    out["apps"] = current_apps
+    out["apps_60"] = weight * float(current.get("apps_60", 0.0))
+    return out, weight
+
+
 def build_player_table(
     current: pd.DataFrame,
     prev: pd.DataFrame,
@@ -304,13 +357,14 @@ def build_player_table(
 ) -> pd.DataFrame:
     """
     Form = `current` (L6–L8 lineups veya sezon proxy).
-    Baz = meta['current_season_df'] içinde ≥8 maç varsa o satır; yoksa `prev`.
+    Baz = mevcut sezon + önceki sezon örnek-büyüklüğü kontrollü karışım.
     projected = w_form * form_pts + w_base * base_pts
     """
     meta = meta or {}
     current_season: pd.DataFrame = meta.get("current_season_df")
     if current_season is None or not isinstance(current_season, pd.DataFrame):
         current_season = pd.DataFrame()
+    fixture_context: dict[str, dict[str, Any]] = meta.get("fixture_context") or {}
 
     rows: list[dict[str, Any]] = []
 
@@ -320,7 +374,17 @@ def build_player_table(
             return out
         for _, r in df.iterrows():
             key = normalize_name(str(r.get("player", "")))
-            if key:
+            if not key:
+                continue
+            existing = out.get(key)
+            sample = float(r.get("mp") or 0) * 10000 + float(r.get("minutes") or 0)
+            existing_sample = (
+                float(existing.get("mp") or 0) * 10000
+                + float(existing.get("minutes") or 0)
+                if existing is not None
+                else -1.0
+            )
+            if sample > existing_sample:
                 out[key] = r
         return out
 
@@ -328,7 +392,7 @@ def build_player_table(
     cur_idx = index_by_player(current_season)
     prev_idx = index_by_player(prev)
 
-    all_keys = set(form_idx) | set(cur_idx) | set(prev_idx)
+    all_keys = sorted(set(form_idx) | set(cur_idx) | set(prev_idx))
 
     for key in all_keys:
         form_row = form_idx.get(key)
@@ -357,17 +421,22 @@ def build_player_table(
         form_rates = _row_rates(form_row) if form_row is not None else _empty_rates()
         form_apps = form_rates["apps"]
 
-        # Baz seçimi: mevcut sezon ≥8 maç → current season; değilse prev; yoksa form
+        # Mevcut sezonu 8 maç altındayken tamamen atmak ciddi hataydı:
+        # 7 maçlık 25/26 Hajradinović yerine 24/25'i kullanıyordu.
         cur_apps = float(cur.get("mp") or 0) if cur is not None else 0.0
-        if cur is not None and cur_apps >= MIN_APPS_FOR_CURRENT_BASE:
-            base_rates = _row_rates(cur)
+        cur_rates = _row_rates(cur) if cur is not None else _empty_rates()
+        prev_rates = _row_rates(pr) if pr is not None else _empty_rates()
+        if cur_rates.get("apps", 0) > 0 and prev_rates.get("apps", 0) > 0:
+            base_rates, season_weight = _blend_rate_sets(
+                cur_rates, prev_rates, cur_apps
+            )
+            base_src = f"current+prev ({season_weight:.0%} current)"
+        elif cur_rates.get("apps", 0) > 0:
+            base_rates = cur_rates
             base_src = "current_season"
-        elif pr is not None:
-            base_rates = _row_rates(pr)
+        elif prev_rates.get("apps", 0) > 0:
+            base_rates = prev_rates
             base_src = "prev_season"
-        elif cur is not None:
-            base_rates = _row_rates(cur)
-            base_src = "current_small"
         elif form_row is not None:
             base_rates = form_rates
             base_src = "form_only"
@@ -383,9 +452,24 @@ def build_player_table(
 
         team_form_cs = _lookup_cs(squad, form_cs)
         team_base_cs = _lookup_cs(squad, base_cs)
+        fixture = lookup_fixture_context(squad, fixture_context)
+        fixture_attack = float(fixture.get("attack_mult") or 1.0)
+        fixture_cs = float(fixture.get("cs_mult") or 1.0)
 
-        form_pts = expected_points_from_rates(form_rates, position, team_form_cs)
-        base_pts = expected_points_from_rates(base_rates, position, team_base_cs)
+        form_pts = expected_points_from_rates(
+            form_rates,
+            position,
+            team_form_cs,
+            attack_mult=fixture_attack,
+            cs_mult=fixture_cs,
+        )
+        base_pts = expected_points_from_rates(
+            base_rates,
+            position,
+            team_base_cs,
+            attack_mult=fixture_attack,
+            cs_mult=fixture_cs,
+        )
 
         if form_apps <= 0:
             w_f, w_b = 0.0, 1.0
@@ -393,6 +477,15 @@ def build_player_table(
             w_f, w_b = blend_weights(form_apps)
 
         projected = w_f * form_pts + w_b * base_pts
+
+        # Son L6'da görünmemek yalnızca "form verisi yok" değildir; haftalık
+        # oynama ihtimali için güçlü negatif sinyaldir. Sezon bazı bunu ezmesin.
+        recent_matches = max(1.0, float(meta.get("form_matches") or 6))
+        if cur_rates.get("apps", 0) > 0 and not current.empty:
+            recency_mult = _recency_multiplier(form_apps, recent_matches)
+            projected *= recency_mult
+        else:
+            recency_mult = 1.0
 
         if base_rates.get("min_per_app", 0) < 20 and form_rates.get("min_per_app", 0) < 20:
             projected *= 0.35
@@ -421,6 +514,10 @@ def build_player_table(
             )
         share = form_rates.get("share_60") or base_rates.get("share_60") or 0
         reason_bits.append(f"60+ dk ~{share:.0%} → {1 + share:.1f}p dakika")
+        if fixture:
+            venue = "iç saha" if fixture.get("home") else "deplasman"
+            reason_bits.append(f"{fixture.get('opponent')} ({venue})")
+        reason_bits.append(f"L6 katılım {form_apps:.0f}/{recent_matches:.0f}")
         reason_bits.append(f"blend {w_f:.0%}/{w_b:.0%} ({base_src})")
 
         rows.append(
@@ -454,6 +551,11 @@ def build_player_table(
                     1,
                 ),
                 "team_cs_form": team_form_cs,
+                "fixture_opponent": fixture.get("opponent") or "",
+                "fixture_home": fixture.get("home"),
+                "fixture_attack_mult": fixture_attack,
+                "fixture_cs_mult": fixture_cs,
+                "recency_mult": recency_mult,
                 "reason": "; ".join(reason_bits),
                 "player_key": key,
             }
@@ -478,6 +580,31 @@ def _lookup_cs(squad: str, cs_map: dict[str, float]) -> float | None:
         if n in nk or nk in n:
             return float(v)
     return None
+
+
+def lookup_fixture_context(
+    squad: str,
+    context: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    if not squad or not context:
+        return {}
+    normalized = normalize_name(squad)
+    if normalized in context:
+        return context[normalized]
+    for key, value in context.items():
+        if normalized in key or key in normalized:
+            return value
+    generic = {"fk", "jk", "spor", "sportif", "faaliyetler", "istanbul"}
+    tokens = set(normalized.split()) - generic
+    best: tuple[float, dict[str, Any]] | None = None
+    for key, value in context.items():
+        other = set(key.split()) - generic
+        if not tokens or not other:
+            continue
+        score = len(tokens & other) / len(tokens | other)
+        if score >= 0.5 and (best is None or score > best[0]):
+            best = (score, value)
+    return best[1] if best else {}
 
 
 def availability_multiplier(status: str | None, percent: float | None = None) -> float:
@@ -510,6 +637,28 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     if isinstance(ext, pd.Series):
         pts = pts.where(~ext, pts * NEW_SIGNING_MULT)
         pts = pts.where(~low, pts * LOW_SAMPLE_MULT)
+
+    # Sezon başladıktan sonra resmî TFF gerçekleşen puanını düşük ağırlıkla kalibre et.
+    # Bu alanlar sezon başında sıfırdır; o durumda model değişmez.
+    zeros = pd.Series(0.0, index=out.index)
+    tff_minutes = pd.to_numeric(out.get("tff_minutes", zeros), errors="coerce").fillna(0.0)
+    tff_starts = pd.to_numeric(out.get("tff_starts", zeros), errors="coerce").fillna(0.0)
+    tff_points = pd.to_numeric(out.get("tff_points", zeros), errors="coerce").fillna(0.0)
+    tff_ppm = pd.to_numeric(out.get("tff_ppm", zeros), errors="coerce").fillna(0.0)
+    official_apps = pd.concat(
+        [tff_starts, tff_minutes / 75.0], axis=1
+    ).max(axis=1)
+    official_ppg = tff_ppm.where(
+        tff_ppm > 0,
+        tff_points / official_apps.where(official_apps > 0, 1.0),
+    )
+    official_weight = (official_apps / 30.0).clip(lower=0.0, upper=0.35)
+    has_official = tff_minutes > 0
+    pts = pts.where(
+        ~has_official,
+        (1.0 - official_weight) * pts + official_weight * official_ppg,
+    )
+    out["tff_calibration_weight"] = official_weight.where(has_official, 0.0)
 
     avail = out["availability"].astype(str) if "availability" in out.columns else None
     pct = pd.to_numeric(out.get("avail_pct", None), errors="coerce") if "avail_pct" in out.columns else None

@@ -12,10 +12,15 @@ import pandas as pd
 
 from .config import BUDGET_M, CACHE_DIR, COOKIE_FILE, DATA_DIR, FORM_MATCHES, PRICES_FILE, is_quiet
 from .fetch_external import apply_external_priors
+from .fetch_fotmob import apply_fotmob_validation
 from .fetch_stats import load_dual_season_stats
 from .load_prices import load_prices, merge_prices
 from .optimize import optimize_squad
-from .scoring import apply_context_adjustments, build_player_table
+from .scoring import (
+    apply_context_adjustments,
+    build_player_table,
+    lookup_fixture_context,
+)
 from .tff_client import fetch_tff_prices, load_saved_login, save_prices_csv
 
 ProgressCb = Callable[[str], None]
@@ -109,10 +114,20 @@ def run_pipeline(
 
     prices = load_prices(prices_path)
     merged = merge_prices(players, prices)
+    fixture_context = meta.get("fixture_context") or {}
+    for idx, row in merged.iterrows():
+        fixture = lookup_fixture_context(str(row.get("team") or ""), fixture_context)
+        if fixture:
+            merged.at[idx, "fixture_opponent"] = fixture.get("opponent") or ""
+            merged.at[idx, "fixture_home"] = fixture.get("home")
+            merged.at[idx, "fixture_attack_mult"] = fixture.get("attack_mult") or 1.0
+            merged.at[idx, "fixture_cs_mult"] = fixture.get("cs_mult") or 1.0
     matched = int(merged["stats_player"].notna().sum())
     _say(progress, f"SL eşleşmesi: {matched}/{len(merged)}")
 
     merged = apply_external_priors(merged, progress=progress)
+    _say(progress, "FotMob ikinci kaynak (ilk 11 + güncel kulüp maçları)...")
+    merged = apply_fotmob_validation(merged, progress=progress)
     merged = apply_context_adjustments(merged)
     ext_n = int((merged.get("data_src") == "external_prior").sum()) if "data_src" in merged.columns else 0
     _say(progress, f"En iyi diziliş + XI + yedek optimize ediliyor ({ext_n} yeni imza)...")
@@ -167,7 +182,9 @@ def run_pipeline(
             "bench_shape": result.get("bench_shape") or {},
             "method": (
                 "dakika (60+=2p) + xG/xA + şut/kilit pas + CS/kart/bonus/penaltı; "
-                "yeni imza son 1–2 lig sezonu G/A kapasitesi; hazırlık XI teyidi; "
+                "mevcut/önceki sezon örnek küçültme; haftalık rakip ve iç/dış saha; "
+                "Sofascore + FotMob ilk 11/xG/güncel maç doğrulaması; "
+                "resmî TFF puan kalibrasyonu; yeni imza son 1–2 lig sezonu; "
                 "diziliş otomatik (4-4-2/4-5-1/3-5-2…); yedek otomatik giriş."
             ),
         }

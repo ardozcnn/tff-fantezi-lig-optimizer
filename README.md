@@ -38,8 +38,12 @@ python -m src.main --export-stats out.csv   rem tam analiz tablosu
 ## Analiz (arka planda)
 
 - TFF resmi puan kuralları: dakika (60+ = 2p), gol/asist, CS, kart, bonus, penaltı
-- Süper Lig form (son 6 maç) + sezon bazı (xG/xA, şut, kilit pas)
+- Sofascore sezon/form verisi + FotMob ikinci kaynak doğrulaması
+- FotMob ilk 11, xG/xA, şut ve güncel hazırlık/resmî kulüp maçları
+- Mevcut sezon az maçlıysa veri atılmaz; önceki sezonla örnek büyüklüğüne göre karıştırılır
+- Haftanın rakibi, iç/dış saha ve rakibin hücum/savunma gücü
 - Yeni transferler: son 1–2 lig sezonu + hazırlık maçı dakikası (varsa)
+- Sezon başladıktan sonra resmî TFF puanı/BPS alanlarıyla düşük ağırlıklı kalibrasyon
 - Sakat/cezalı oyuncular TFF `availabilityStatus` ile kırpılır
 - Optimizer en iyi dizilişi seçer; yedekler otomatik değişim için ağırlıklı
 

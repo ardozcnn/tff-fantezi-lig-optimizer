@@ -12,3 +12,4 @@ data/prices.csv
 data/tff_cookies.txt
 data/tff_login.txt
 data/tff_raw.json
+data/analysis_debug*.csv

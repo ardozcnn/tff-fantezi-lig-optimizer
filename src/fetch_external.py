@@ -464,6 +464,8 @@ def project_external_player(
     *,
     tff_position: str,
     price_m: float,
+    fixture_attack_mult: float = 1.0,
+    fixture_cs_mult: float = 1.0,
 ) -> dict[str, Any]:
     rates = rates_from_totals(row)
     friendly_min = float(row.get("friendly_minutes") or 0)
@@ -477,7 +479,10 @@ def project_external_player(
         rates["share_60"] = 0.0
 
     tid = int(row.get("tournament_id") or 0)
-    attack_mult = ATTACK_MULT.get(tid, 1.04 if row.get("tournament") else 1.0)
+    attack_mult = (
+        ATTACK_MULT.get(tid, 1.04 if row.get("tournament") else 1.0)
+        * fixture_attack_mult
+    )
     cs_mult = CS_MULT.get(tid, 1.0)
     pts = expected_points_from_rates(
         rates,
@@ -485,6 +490,7 @@ def project_external_player(
         team_cs_rate=(rates.get("cs_rate") or 0.0) * cs_mult,
         appearance=appearance_prior(price_m, rates.get("apps") or 0.0, friendly_min),
         attack_mult=attack_mult,
+        cs_mult=fixture_cs_mult,
     )
     season = str(row.get("season") or "").strip()
     tourn = str(row.get("tournament") or "").strip()
@@ -638,12 +644,11 @@ def apply_external_priors(
         pts = float(r.get("projected_pts") or 0)
         if unmatched:
             return True
-        # Ligde oturmuş (Osimhen vb.) — SL sezonunu dış ligle ezme
-        if sl_apps >= 8 and pts >= 2.0:
+        # Eşleşmiş ve en az 4 SL maçı olan oyuncuyu eski dış lig verisiyle ezme.
+        # Örn. 25/26'da 7 maçı olan Hajradinović'e 2018/19 HNL bağlanıyordu.
+        if sl_apps >= 4:
             return False
-        if sl_apps < 8:
-            return True
-        if price >= 8.0 and pts < 2.0:
+        if sl_apps < 4:
             return True
         return False
 
@@ -672,6 +677,8 @@ def apply_external_priors(
                     "team": str(r.get("team") or ""),
                     "position": str(r.get("position") or "MF"),
                     "price_m": float(r["price_m"]),
+                    "fixture_attack_mult": float(r.get("fixture_attack_mult") or 1.0),
+                    "fixture_cs_mult": float(r.get("fixture_cs_mult") or 1.0),
                     "extras": extras,
                 },
             )
@@ -689,6 +696,8 @@ def apply_external_priors(
             raw,
             tff_position=spec["position"],
             price_m=spec["price_m"],
+            fixture_attack_mult=spec["fixture_attack_mult"],
+            fixture_cs_mult=spec["fixture_cs_mult"],
         )
         return idx, proj
 

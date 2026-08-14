@@ -21,6 +21,14 @@ OPTIONAL = (
     "selected_by",
     "tff_xg",
     "tff_xa",
+    "tff_points",
+    "tff_ppm",
+    "tff_minutes",
+    "tff_starts",
+    "tff_goals",
+    "tff_assists",
+    "tff_bonus",
+    "tff_bps",
 )
 
 
@@ -158,6 +166,14 @@ def merge_prices(stats: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
             "selected_by": pr.get("selected_by") or 0,
             "tff_xg": pr.get("tff_xg") or 0,
             "tff_xa": pr.get("tff_xa") or 0,
+            "tff_points": pr.get("tff_points") or 0,
+            "tff_ppm": pr.get("tff_ppm") or 0,
+            "tff_minutes": pr.get("tff_minutes") or 0,
+            "tff_starts": pr.get("tff_starts") or 0,
+            "tff_goals": pr.get("tff_goals") or 0,
+            "tff_assists": pr.get("tff_assists") or 0,
+            "tff_bonus": pr.get("tff_bonus") or 0,
+            "tff_bps": pr.get("tff_bps") or 0,
         }
 
         if st is not None:
@@ -182,6 +198,11 @@ def merge_prices(stats: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
                     "base_apps": st.get("base_apps", 0),
                     "data_src": st.get("data_src", "super_lig"),
                     "base_src": st.get("base_src", ""),
+                    "fixture_opponent": st.get("fixture_opponent", ""),
+                    "fixture_home": st.get("fixture_home"),
+                    "fixture_attack_mult": st.get("fixture_attack_mult", 1.0),
+                    "fixture_cs_mult": st.get("fixture_cs_mult", 1.0),
+                    "recency_mult": st.get("recency_mult", 1.0),
                 }
             )
         else:
@@ -205,6 +226,11 @@ def merge_prices(stats: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
                     "base_apps": 0,
                     "data_src": "",
                     "base_src": "",
+                    "fixture_opponent": "",
+                    "fixture_home": None,
+                    "fixture_attack_mult": 1.0,
+                    "fixture_cs_mult": 1.0,
+                    "recency_mult": 1.0,
                 }
             )
 

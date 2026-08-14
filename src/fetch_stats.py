@@ -14,6 +14,7 @@ import pandas as pd
 from curl_cffi import requests as curl_requests
 
 from .config import CACHE_DIR, FORM_MATCHES, REQUEST_DELAY_S, is_quiet
+from .names import normalize_name
 
 
 def _log(msg: str) -> None:
@@ -159,6 +160,95 @@ def fetch_standings_teams(season_id: int) -> list[dict[str, Any]]:
             seen.add(t["id"])
             out.append(t)
     return out
+
+
+def fetch_standings_rows(season_id: int) -> list[dict[str, Any]]:
+    try:
+        data = sofa_get(
+            f"/unique-tournament/{UNIQUE_TOURNAMENT_ID}/season/{season_id}/standings/total",
+            cache_key=f"sofa_standings_{season_id}",
+            max_age_hours=12,
+        )
+    except SofaNotFound:
+        return []
+    rows: list[dict[str, Any]] = []
+    for block in data.get("standings") or []:
+        rows.extend(r for r in block.get("rows") or [] if isinstance(r, dict))
+    return rows
+
+
+def fetch_upcoming_events(season_id: int, max_pages: int = 2) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for page in range(max_pages):
+        try:
+            data = sofa_get(
+                f"/unique-tournament/{UNIQUE_TOURNAMENT_ID}/season/{season_id}/events/next/{page}",
+                cache_key=f"sofa_events_next_{season_id}_{page}",
+                max_age_hours=3,
+                delay=0.2,
+            )
+        except SofaNotFound:
+            break
+        batch = data.get("events") or []
+        events.extend(batch)
+        if not data.get("hasNextPage"):
+            break
+    events.sort(key=lambda e: e.get("startTimestamp") or 0)
+    return events
+
+
+def build_fixture_context(
+    upcoming_season_id: int,
+    strength_season_id: int,
+) -> dict[str, dict[str, Any]]:
+    """İlk gelecek maç + rakibin sezon hücum/savunma gücü."""
+    rows = fetch_standings_rows(strength_season_id)
+    metrics: dict[str, dict[str, float]] = {}
+    total_goals = total_matches = 0.0
+    for row in rows:
+        team = row.get("team") or {}
+        key = normalize_name(str(team.get("name") or ""))
+        matches = float(row.get("matches") or 0)
+        if not key or matches <= 0:
+            continue
+        gf = float(row.get("scoresFor") or 0)
+        ga = float(row.get("scoresAgainst") or 0)
+        metrics[key] = {"gf": gf / matches, "ga": ga / matches}
+        total_goals += gf
+        total_matches += matches
+
+    league_goal_rate = total_goals / total_matches if total_matches else 1.35
+    events = fetch_upcoming_events(upcoming_season_id)
+    context: dict[str, dict[str, Any]] = {}
+
+    def add(team: str, opponent: str, home: bool) -> None:
+        key = normalize_name(team)
+        if not key or key in context:
+            return
+        opp = metrics.get(normalize_name(opponent))
+        if opp:
+            opponent_defence = opp["ga"] / league_goal_rate
+            opponent_attack = opp["gf"] / league_goal_rate
+        else:
+            opponent_defence = opponent_attack = 1.0
+        attack_mult = opponent_defence * (1.06 if home else 0.94)
+        cs_mult = (1.0 / max(opponent_attack, 0.55)) * (1.08 if home else 0.92)
+        context[key] = {
+            "opponent": opponent,
+            "home": home,
+            "attack_mult": max(0.78, min(1.22, attack_mult)),
+            "cs_mult": max(0.75, min(1.25, cs_mult)),
+        }
+
+    for event in events:
+        home = str((event.get("homeTeam") or {}).get("name") or "")
+        away = str((event.get("awayTeam") or {}).get("name") or "")
+        if home and away:
+            add(home, away, True)
+            add(away, home, False)
+        if len(context) >= 18:
+            break
+    return context
 
 
 def _merge_top_players(top: dict[str, list]) -> dict[int, dict[str, Any]]:
@@ -711,6 +801,7 @@ def load_dual_season_stats(
     """
     if current_start is None:
         current_start = discover_current_season_start()
+    requested_start = current_start
     prev_start = current_start - 1
     meta: dict[str, Any] = {
         "current_start": current_start,
@@ -775,6 +866,18 @@ def load_dual_season_stats(
     meta["prev_season_rows"] = len(prev_season)
     meta["form_rows"] = len(form_df)
 
+    fixture_context: dict[str, dict[str, Any]] = {}
+    try:
+        upcoming_sid = resolve_season_id(requested_start)
+        strength_sid = resolve_season_id(current_start)
+        fixture_context = build_fixture_context(upcoming_sid, strength_sid)
+        if fixture_context:
+            meta["notes"].append(
+                f"Haftalık rakip/iç-dış saha: {len(fixture_context)} takım için uygulandı."
+            )
+    except Exception as exc:  # noqa: BLE001
+        meta["notes"].append(f"Fikstür etkisi alınamadı ({exc}); nötr rakip varsayıldı.")
+
     # Stitch: scoring build_player_table expects current=form, prev=base pool
     # We merge current_season into a "base_preferred" by passing prev_season as prev
     # and putting current_season rows where form missing — handled in scoring update.
@@ -782,4 +885,5 @@ def load_dual_season_stats(
     return form_df, prev_season, form_cs, base_cs, {
         **meta,
         "current_season_df": current_season,
+        "fixture_context": fixture_context,
     }
