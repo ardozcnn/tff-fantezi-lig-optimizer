@@ -806,9 +806,11 @@ def load_dual_season_stats(
     meta: dict[str, Any] = {
         "current_start": current_start,
         "prev_start": prev_start,
+        "requested_start": requested_start,
         "form_matches": form_matches,
         "source": "sofascore",
         "notes": [],
+        "preseason": False,
     }
 
     # Baz sezonlar
@@ -821,6 +823,7 @@ def load_dual_season_stats(
         meta["notes"].append(
             f"{season_label(current_start)} {why}; {season_label(prev_start)} deneniyor."
         )
+        meta["preseason"] = True
         current_season = fetch_season_player_stats(prev_start, enrich=True)
         current_start = prev_start
         prev_start = current_start - 1

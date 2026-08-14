@@ -1,0 +1,5293 @@
+{
+  "version": 2,
+  "generated_at": "2026-08-14T00:54:33.195700+00:00",
+  "target_tournament_id": 52,
+  "method": {
+    "description": "Aynı oyuncunun dış lig sezonu ile ilk sonraki Süper Lig sezonu; 450+ dakika iki tarafta; ilk kez gelenler; dakika ağırlıklı doğrusal kalibrasyon; lig katsayıları global mevki modeline küçültülür.",
+    "min_minutes_each_side": 450.0,
+    "cross_validation": "Son üç sezon ileri-zaman doğrulaması; küçültme gücü ve kimlik-model karışımı MAE ile seçilir.",
+    "tournament_identity": "Turnuva adı ve tier bilgisi canlı Sofascore metadata ile doğrulanır; xG/xA bulunmayan eski sezonlar sıfır sayılmaz.",
+    "mean_cv_improvement_vs_identity": 0.16280743693050695
+  },
+  "sample": {
+    "n_players": 845,
+    "n_pairs": 845,
+    "target_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "n_leagues": 64
+  },
+  "global": {
+    "positions": {
+      "DF": {
+        "goals_p90": {
+          "intercept": 0.03395538821847588,
+          "slope": 0.19183042609114712,
+          "cap": 0.3179928014835843,
+          "n_players": 267,
+          "local_weight": 0.0
+        },
+        "assists_p90": {
+          "intercept": 0.023303769504466155,
+          "slope": 0.42499690401763357,
+          "cap": 0.3763254921259843,
+          "n_players": 267,
+          "local_weight": 0.0
+        },
+        "xg_p90": {
+          "intercept": 0.01412992926211966,
+          "slope": 0.756839300225363,
+          "cap": 0.24542318148644474,
+          "n_players": 39,
+          "local_weight": 0.0
+        },
+        "xa_p90": {
+          "intercept": 0.0,
+          "slope": 1.0,
+          "cap": 0.3410721152305101,
+          "n_players": 39,
+          "local_weight": 0.0
+        },
+        "shots_on_target_p90": {
+          "intercept": 0.07553071465124417,
+          "slope": 0.4049061643811346,
+          "cap": 0.857538119266055,
+          "n_players": 215,
+          "local_weight": 0.0
+        },
+        "key_passes_p90": {
+          "intercept": 0.11097224658490451,
+          "slope": 0.7215087080105111,
+          "cap": 2.1843890020198695,
+          "n_players": 215,
+          "local_weight": 0.0
+        },
+        "yellow_cards_p90": {
+          "intercept": 0.11570797904830965,
+          "slope": 0.42445720362259526,
+          "cap": 0.6914240878273752,
+          "n_players": 267,
+          "local_weight": 0.0
+        },
+        "red_cards_p90": {
+          "intercept": 0.0,
+          "slope": 1.0,
+          "cap": 0.20102014881276678,
+          "n_players": 267,
+          "local_weight": 0.0
+        },
+        "clean_sheet_rate": {
+          "intercept": 0.1970977258852722,
+          "slope": 0.0,
+          "cap": 0.5986744615384634,
+          "n_players": 267,
+          "local_weight": 0.0
+        },
+        "minutes_per_app": {
+          "intercept": 44.20121456500607,
+          "slope": 0.41571257820315155,
+          "cap": 90.0,
+          "n_players": 267,
+          "local_weight": 0.0
+        },
+        "rating": {
+          "intercept": 5.499367771634779,
+          "slope": 0.19360257250240837,
+          "cap": 8.6815152,
+          "n_players": 215,
+          "local_weight": 0.0
+        }
+      },
+      "MF": {
+        "goals_p90": {
+          "intercept": 0.05233750704064632,
+          "slope": 0.5282463073712514,
+          "cap": 0.7461468835767554,
+          "n_players": 334,
+          "local_weight": 0.0
+        },
+        "assists_p90": {
+          "intercept": 0.08841157475458286,
+          "slope": 0.23094742673788976,
+          "cap": 0.688246597338624,
+          "n_players": 334,
+          "local_weight": 0.0
+        },
+        "xg_p90": {
+          "intercept": 0.062067765671434266,
+          "slope": 0.4651036946708462,
+          "cap": 0.48207985293272815,
+          "n_players": 51,
+          "local_weight": 0.0
+        },
+        "xa_p90": {
+          "intercept": 0.03966409333790437,
+          "slope": 0.724671966684341,
+          "cap": 0.4130487302711339,
+          "n_players": 51,
+          "local_weight": 0.0
+        },
+        "shots_on_target_p90": {
+          "intercept": 0.11078532108505403,
+          "slope": 0.7119595637650417,
+          "cap": 1.9375285437376446,
+          "n_players": 268,
+          "local_weight": 0.0
+        },
+        "key_passes_p90": {
+          "intercept": 0.23206282104441964,
+          "slope": 0.7781298145714304,
+          "cap": 4.1003776115887725,
+          "n_players": 268,
+          "local_weight": 0.0
+        },
+        "yellow_cards_p90": {
+          "intercept": 0.13553914054544697,
+          "slope": 0.39535507768250805,
+          "cap": 0.8837269374034704,
+          "n_players": 334,
+          "local_weight": 0.0
+        },
+        "red_cards_p90": {
+          "intercept": 0.010786723586459783,
+          "slope": 0.0,
+          "cap": 0.17759494808271115,
+          "n_players": 334,
+          "local_weight": 0.0
+        },
+        "clean_sheet_rate": {
+          "intercept": 0.051516948177543646,
+          "slope": 0.396286518020536,
+          "cap": 0.46361030769230743,
+          "n_players": 334,
+          "local_weight": 0.0
+        },
+        "minutes_per_app": {
+          "intercept": 43.53282203205025,
+          "slope": 0.3062749969364534,
+          "cap": 90.0,
+          "n_players": 334,
+          "local_weight": 0.0
+        },
+        "rating": {
+          "intercept": 3.4683059506833778,
+          "slope": 0.49163509408269046,
+          "cap": 9.013146900000002,
+          "n_players": 268,
+          "local_weight": 0.0
+        }
+      },
+      "FW": {
+        "goals_p90": {
+          "intercept": 0.17841254993534672,
+          "slope": 0.48162541555627386,
+          "cap": 1.2248013266483273,
+          "n_players": 208,
+          "local_weight": 0.0
+        },
+        "assists_p90": {
+          "intercept": 0.08759228188824694,
+          "slope": 0.2094564370442319,
+          "cap": 0.7988342479457287,
+          "n_players": 208,
+          "local_weight": 0.0
+        },
+        "xg_p90": {
+          "intercept": 0.06041327621222131,
+          "slope": 0.9082725214353528,
+          "cap": 1.0778125852367528,
+          "n_players": 33,
+          "local_weight": 0.0
+        },
+        "xa_p90": {
+          "intercept": 0.038177802182877967,
+          "slope": 0.6591993557371164,
+          "cap": 0.3948734443021767,
+          "n_players": 33,
+          "local_weight": 0.0
+        },
+        "shots_on_target_p90": {
+          "intercept": 0.49157851602247066,
+          "slope": 0.49253241650030954,
+          "cap": 2.641040373971578,
+          "n_players": 179,
+          "local_weight": 0.0
+        },
+        "key_passes_p90": {
+          "intercept": 0.25540678479474455,
+          "slope": 0.7454519947824746,
+          "cap": 3.2686120006810797,
+          "n_players": 179,
+          "local_weight": 0.0
+        },
+        "yellow_cards_p90": {
+          "intercept": 0.10771248212033269,
+          "slope": 0.36697675973270427,
+          "cap": 0.7984903361344544,
+          "n_players": 208,
+          "local_weight": 0.0
+        },
+        "red_cards_p90": {
+          "intercept": 0.0078013295171840994,
+          "slope": 0.0,
+          "cap": 0.1577861775147931,
+          "n_players": 208,
+          "local_weight": 0.0
+        },
+        "minutes_per_app": {
+          "intercept": 59.329862237594305,
+          "slope": 0.0,
+          "cap": 90.0,
+          "n_players": 208,
+          "local_weight": 0.0
+        },
+        "rating": {
+          "intercept": 4.256023727463832,
+          "slope": 0.3783130609391583,
+          "cap": 9.086178,
+          "n_players": 179,
+          "local_weight": 0.0
+        }
+      },
+      "GK": {
+        "yellow_cards_p90": {
+          "intercept": 0.08363628335038557,
+          "slope": 0.15030361009439536,
+          "cap": 0.4017763419483105,
+          "n_players": 36,
+          "local_weight": 0.0
+        },
+        "red_cards_p90": {
+          "intercept": 0.0039856620689900394,
+          "slope": 0.0,
+          "cap": 0.05801540888176059,
+          "n_players": 36,
+          "local_weight": 0.0
+        },
+        "saves_p90": {
+          "intercept": 1.4208662050353877,
+          "slope": 0.5254372772908401,
+          "cap": 5.022311538461539,
+          "n_players": 36,
+          "local_weight": 0.0
+        },
+        "goals_conceded_p90": {
+          "intercept": 0.6159172327708142,
+          "slope": 0.5650042480675543,
+          "cap": 2.8686149827784178,
+          "n_players": 36,
+          "local_weight": 0.0
+        },
+        "clean_sheet_rate": {
+          "intercept": 0.16059906806454805,
+          "slope": 0.31693558747089084,
+          "cap": 0.5787083333333336,
+          "n_players": 36,
+          "local_weight": 0.0
+        },
+        "minutes_per_app": {
+          "intercept": 0.0,
+          "slope": 1.0,
+          "cap": 90.0,
+          "n_players": 36,
+          "local_weight": 0.0
+        },
+        "rating": {
+          "intercept": 4.856290425577961,
+          "slope": 0.30000650163576437,
+          "cap": 8.725406099999999,
+          "n_players": 30,
+          "local_weight": 0.0
+        }
+      }
+    }
+  },
+  "leagues": {
+    "8": {
+      "name": "LaLiga",
+      "n_players": 16,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03486063817636483,
+            "slope": 0.19887187678884607,
+            "cap": 0.3179928014835843,
+            "n_players": 7,
+            "local_weight": 0.14532235157913131
+          },
+          "assists_p90": {
+            "intercept": 0.03225102390532699,
+            "slope": 0.4689898762938781,
+            "cap": 0.3763254921259843,
+            "n_players": 7,
+            "local_weight": 0.5763168120059753
+          },
+          "xa_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.3410721152305101,
+            "n_players": 3,
+            "local_weight": 0.36591207153543037
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08309933512691095,
+            "slope": 0.39792317511246034,
+            "cap": 0.857538119266055,
+            "n_players": 7,
+            "local_weight": 0.14532235157913131
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 7,
+            "local_weight": 0.5763168120059753
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.1961404933428709,
+            "slope": 0.019065998602299412,
+            "cap": 0.5986744615384634,
+            "n_players": 7,
+            "local_weight": 0.07998384968298858
+          },
+          "minutes_per_app": {
+            "intercept": 46.24545972864361,
+            "slope": 0.3971789798285087,
+            "cap": 90.0,
+            "n_players": 7,
+            "local_weight": 0.25802250013505973
+          },
+          "rating": {
+            "intercept": 6.337769254217626,
+            "slope": 0.08409142414622021,
+            "cap": 8.6815152,
+            "n_players": 7,
+            "local_weight": 0.5817647864607857
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05488982844085231,
+            "slope": 0.5582432726178798,
+            "cap": 0.7461468835767554,
+            "n_players": 6,
+            "local_weight": 0.2131541342865703
+          },
+          "assists_p90": {
+            "intercept": 0.08912643829576332,
+            "slope": 0.2115724386138945,
+            "cap": 0.688246597338624,
+            "n_players": 6,
+            "local_weight": 0.03275303008773228
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.12710622840759478,
+            "slope": 0.7105433385941389,
+            "cap": 1.9375285437376446,
+            "n_players": 6,
+            "local_weight": 0.2131541342865703
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13803232060295595,
+            "slope": 0.2901645966332846,
+            "cap": 0.8837269374034704,
+            "n_players": 6,
+            "local_weight": 0.3514048681240684
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.07074151954445267,
+            "slope": 0.3690273811927278,
+            "cap": 0.46361030769230743,
+            "n_players": 6,
+            "local_weight": 0.540305866178563
+          },
+          "minutes_per_app": {
+            "intercept": 44.473697994539066,
+            "slope": 0.29271059154516876,
+            "cap": 90.0,
+            "n_players": 6,
+            "local_weight": 0.06843289060501566
+          },
+          "rating": {
+            "intercept": 3.810797127226453,
+            "slope": 0.44471556426727343,
+            "cap": 9.013146900000002,
+            "n_players": 6,
+            "local_weight": 0.22710683154396333
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.1089915100547883,
+            "slope": 0.8115816842719188,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.3556407971043949
+          },
+          "assists_p90": {
+            "intercept": 0.11690687200491626,
+            "slope": 0.13358612603892572,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.3556407971043949
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.5763142861812841,
+            "slope": 0.49402245737732836,
+            "cap": 2.641040373971578,
+            "n_players": 3,
+            "local_weight": 0.21627926336176154
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14035087999144913,
+            "slope": 0.2692270668658595,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.3556407971043949
+          },
+          "rating": {
+            "intercept": 3.8968104043192326,
+            "slope": 0.4409346974968435,
+            "cap": 9.086178,
+            "n_players": 3,
+            "local_weight": 0.3730685537696345
+          }
+        }
+      },
+      "observed_attack_retention": 1.4981965677148052,
+      "observed_source_ga_p90": 0.1825109788876265,
+      "observed_target_ga_p90": 0.2734373221397113,
+      "observed_attack_retention_p10": 1.2050561872608156,
+      "observed_attack_retention_p90": 1.8328626256474303
+    },
+    "17": {
+      "name": "Premier League",
+      "n_players": 42,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.040463654441779344,
+            "slope": 0.2554551028851728,
+            "cap": 0.3179928014835843,
+            "n_players": 10,
+            "local_weight": 0.18331978134112129
+          },
+          "assists_p90": {
+            "intercept": 0.01973462327728254,
+            "slope": 0.7490565731890186,
+            "cap": 0.3763254921259843,
+            "n_players": 10,
+            "local_weight": 0.6423149707713904
+          },
+          "xa_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.3410721152305101,
+            "n_players": 5,
+            "local_weight": 0.47146396234357374
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08346445660892945,
+            "slope": 0.39470412245908604,
+            "cap": 0.857538119266055,
+            "n_players": 10,
+            "local_weight": 0.18331978134112129
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 10,
+            "local_weight": 0.6423149707713904
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.20078364397569942,
+            "slope": 0.0021956721555877784,
+            "cap": 0.5986744615384634,
+            "n_players": 10,
+            "local_weight": 0.1049534275388184
+          },
+          "minutes_per_app": {
+            "intercept": 47.97490004007157,
+            "slope": 0.3713354365815027,
+            "cap": 90.0,
+            "n_players": 10,
+            "local_weight": 0.3192838932817117
+          },
+          "rating": {
+            "intercept": 6.192806980280848,
+            "slope": 0.10926369685390247,
+            "cap": 8.6815152,
+            "n_players": 10,
+            "local_weight": 0.6523147724999615
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.06356835684990313,
+            "slope": 0.6626065372054377,
+            "cap": 0.7461468835767554,
+            "n_players": 19,
+            "local_weight": 0.46574791136097216
+          },
+          "assists_p90": {
+            "intercept": 0.0908547352716616,
+            "slope": 0.250140298690364,
+            "cap": 0.688246597338624,
+            "n_players": 19,
+            "local_weight": 0.09826393263268719
+          },
+          "xg_p90": {
+            "intercept": 0.06354073511740539,
+            "slope": 0.49944720183707286,
+            "cap": 0.48207985293272815,
+            "n_players": 10,
+            "local_weight": 0.48388127913061546
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.15073307384500687,
+            "slope": 0.7802520159099566,
+            "cap": 1.9375285437376446,
+            "n_players": 19,
+            "local_weight": 0.46574791136097216
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.11888109287090451,
+            "slope": 0.3977328439978267,
+            "cap": 0.8837269374034704,
+            "n_players": 19,
+            "local_weight": 0.6355088862838866
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.05905693899531993,
+            "slope": 0.6905656055798619,
+            "cap": 0.46361030769230743,
+            "n_players": 19,
+            "local_weight": 0.7897663814851563
+          },
+          "minutes_per_app": {
+            "intercept": 47.08136271205229,
+            "slope": 0.26608155119267163,
+            "cap": 90.0,
+            "n_players": 19,
+            "local_weight": 0.19014459325853425
+          },
+          "rating": {
+            "intercept": 3.860251536268534,
+            "slope": 0.4433533568822582,
+            "cap": 9.013146900000002,
+            "n_players": 19,
+            "local_weight": 0.4843110119185128
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.19284464550493624,
+            "slope": 0.5183668948783526,
+            "cap": 1.2248013266483273,
+            "n_players": 9,
+            "local_weight": 0.6087214359500879
+          },
+          "assists_p90": {
+            "intercept": 0.08231262485874104,
+            "slope": 0.14211230278152598,
+            "cap": 0.7988342479457287,
+            "n_players": 9,
+            "local_weight": 0.6087214359500879
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.5367289182087253,
+            "slope": 0.46100442963940025,
+            "cap": 2.641040373971578,
+            "n_players": 9,
+            "local_weight": 0.4375266403718199
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.18021500051376446,
+            "slope": 0.0902383573284143,
+            "cap": 0.7984903361344544,
+            "n_players": 9,
+            "local_weight": 0.6087214359500879
+          },
+          "rating": {
+            "intercept": 4.19284097399657,
+            "slope": 0.38804669339416586,
+            "cap": 9.086178,
+            "n_players": 9,
+            "local_weight": 0.6340031535644499
+          }
+        },
+        "GK": {
+          "red_cards_p90": {
+            "intercept": 0.007224902560675252,
+            "slope": 0.0,
+            "cap": 0.05801540888176059,
+            "n_players": 4,
+            "local_weight": 0.43629423078474555
+          },
+          "saves_p90": {
+            "intercept": 1.4381697649895246,
+            "slope": 0.5,
+            "cap": 5.022311538461539,
+            "n_players": 4,
+            "local_weight": 0.43629423078474555
+          },
+          "minutes_per_app": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.43725978588984377
+          }
+        }
+      },
+      "observed_attack_retention": 1.616575111192777,
+      "observed_source_ga_p90": 0.18567300236849357,
+      "observed_target_ga_p90": 0.30015435444934424,
+      "observed_attack_retention_p10": 1.4263121480040668,
+      "observed_attack_retention_p90": 1.8244016763299105
+    },
+    "20": {
+      "name": "Eliteserien",
+      "n_players": 17,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03462788429511845,
+            "slope": 0.14073704736834872,
+            "cap": 0.3179928014835843,
+            "n_players": 4,
+            "local_weight": 0.08656616506250626
+          },
+          "assists_p90": {
+            "intercept": 0.04685615685762273,
+            "slope": 0.40716117061310597,
+            "cap": 0.3763254921259843,
+            "n_players": 4,
+            "local_weight": 0.4312236667169185
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.0758458010723257,
+            "slope": 0.344461191726125,
+            "cap": 0.857538119266055,
+            "n_players": 4,
+            "local_weight": 0.08656616506250626
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 4,
+            "local_weight": 0.4312236667169185
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19448660634516707,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 4,
+            "local_weight": 0.04749844853262057
+          },
+          "minutes_per_app": {
+            "intercept": 37.02150992730983,
+            "slope": 0.4976915017989154,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.16629721500621045
+          },
+          "rating": {
+            "intercept": 6.371643648026324,
+            "slope": 0.05912154699845889,
+            "cap": 8.6815152,
+            "n_players": 4,
+            "local_weight": 0.4437871558197747
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05251918667560883,
+            "slope": 0.49235844913353544,
+            "cap": 0.7461468835767554,
+            "n_players": 4,
+            "local_weight": 0.1532621057211427
+          },
+          "assists_p90": {
+            "intercept": 0.09013061330036823,
+            "slope": 0.21774212367936996,
+            "cap": 0.688246597338624,
+            "n_players": 4,
+            "local_weight": 0.022124794193549336
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.1708845727197129,
+            "slope": 0.551169343737826,
+            "cap": 1.9375285437376446,
+            "n_players": 4,
+            "local_weight": 0.1532621057211427
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.10793094096796273,
+            "slope": 0.37940436646585457,
+            "cap": 0.8837269374034704,
+            "n_players": 4,
+            "local_weight": 0.2657888522666872
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.037339928211436835,
+            "slope": 0.39386127424234657,
+            "cap": 0.46361030769230743,
+            "n_players": 4,
+            "local_weight": 0.4342857213020852
+          },
+          "minutes_per_app": {
+            "intercept": 43.11741143074207,
+            "slope": 0.3127410236853634,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.045783133777769554
+          },
+          "rating": {
+            "intercept": 3.9767141243060493,
+            "slope": 0.41667262754495493,
+            "cap": 9.013146900000002,
+            "n_players": 4,
+            "local_weight": 0.1610169530105638
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.10124973511949943,
+            "slope": 0.6095198343716834,
+            "cap": 1.2248013266483273,
+            "n_players": 8,
+            "local_weight": 0.5965644162162805
+          },
+          "assists_p90": {
+            "intercept": 0.09784218629423268,
+            "slope": 0.0,
+            "cap": 0.7988342479457287,
+            "n_players": 8,
+            "local_weight": 0.5965644162162805
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.38781872635672204,
+            "slope": 0.5336432898395618,
+            "cap": 2.641040373971578,
+            "n_players": 8,
+            "local_weight": 0.4250743127147443
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.11099330327024734,
+            "slope": 0.31735176493989686,
+            "cap": 0.7984903361344544,
+            "n_players": 8,
+            "local_weight": 0.5965644162162805
+          },
+          "rating": {
+            "intercept": 4.88251765694815,
+            "slope": 0.2768351812420044,
+            "cap": 9.086178,
+            "n_players": 8,
+            "local_weight": 0.6140518947438058
+          }
+        }
+      },
+      "observed_attack_retention": 0.6837263281019205,
+      "observed_source_ga_p90": 0.42728972662498077,
+      "observed_target_ga_p90": 0.2921492358209715,
+      "observed_attack_retention_p10": 0.6000592710854662,
+      "observed_attack_retention_p90": 0.7730568139951058
+    },
+    "22": {
+      "name": "Norwegian 1st Division",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 2.569593147751606,
+      "observed_source_ga_p90": 0.22499999999999998,
+      "observed_target_ga_p90": 0.5781584582441113
+    },
+    "23": {
+      "name": "Serie A",
+      "n_players": 51,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.031503086689411104,
+            "slope": 0.1910169868728002,
+            "cap": 0.3179928014835843,
+            "n_players": 10,
+            "local_weight": 0.1917765138532816
+          },
+          "assists_p90": {
+            "intercept": 0.014342297508427115,
+            "slope": 0.3371073611506179,
+            "cap": 0.3763254921259843,
+            "n_players": 10,
+            "local_weight": 0.6549644791979976
+          },
+          "xa_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.3410721152305101,
+            "n_players": 4,
+            "local_weight": 0.43904587232900905
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.07135279558818913,
+            "slope": 0.36926782774299566,
+            "cap": 0.857538119266055,
+            "n_players": 10,
+            "local_weight": 0.1917765138532816
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 10,
+            "local_weight": 0.6549644791979976
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.1987181013468948,
+            "slope": 0.023512664240720908,
+            "cap": 0.5986744615384634,
+            "n_players": 10,
+            "local_weight": 0.10888596135615305
+          },
+          "minutes_per_app": {
+            "intercept": 45.32355097183599,
+            "slope": 0.40671098652395743,
+            "cap": 90.0,
+            "n_players": 10,
+            "local_weight": 0.32830155434566954
+          },
+          "rating": {
+            "intercept": 3.008793320317238,
+            "slope": 0.5583606292951292,
+            "cap": 8.6815152,
+            "n_players": 10,
+            "local_weight": 0.661596620652502
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.0569398649854919,
+            "slope": 0.5360831801746018,
+            "cap": 0.7461468835767554,
+            "n_players": 24,
+            "local_weight": 0.5242089982034411
+          },
+          "assists_p90": {
+            "intercept": 0.09377842847336322,
+            "slope": 0.22938784323076294,
+            "cap": 0.688246597338624,
+            "n_players": 24,
+            "local_weight": 0.12104942104896786
+          },
+          "xg_p90": {
+            "intercept": 0.06669717834406606,
+            "slope": 0.4885514493109666,
+            "cap": 0.48207985293272815,
+            "n_players": 9,
+            "local_weight": 0.44867424376764353
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.055057694889470626,
+            "slope": 0.895552299998621,
+            "cap": 1.9375285437376446,
+            "n_players": 24,
+            "local_weight": 0.5242089982034411
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.18198507217110974,
+            "slope": 0.25,
+            "cap": 0.8837269374034704,
+            "n_players": 24,
+            "local_weight": 0.6878439883524075
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.05242076258812015,
+            "slope": 0.634685930786627,
+            "cap": 0.46361030769230743,
+            "n_players": 24,
+            "local_weight": 0.825368501275496
+          },
+          "minutes_per_app": {
+            "intercept": 40.71473868605132,
+            "slope": 0.35966613439382333,
+            "cap": 90.0,
+            "n_players": 24,
+            "local_weight": 0.22803557856521162
+          },
+          "rating": {
+            "intercept": 2.7449825579192075,
+            "slope": 0.6057250665028626,
+            "cap": 9.013146900000002,
+            "n_players": 24,
+            "local_weight": 0.5416178766627153
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.23587064865183616,
+            "slope": 0.6892623442768036,
+            "cap": 1.2248013266483273,
+            "n_players": 16,
+            "local_weight": 0.7502858571420353
+          },
+          "assists_p90": {
+            "intercept": 0.08734127674230464,
+            "slope": 0.12457979875940349,
+            "cap": 0.7988342479457287,
+            "n_players": 16,
+            "local_weight": 0.7502858571420353
+          },
+          "xg_p90": {
+            "intercept": 0.0483463291573932,
+            "slope": 0.9717265675365847,
+            "cap": 1.0778125852367528,
+            "n_players": 9,
+            "local_weight": 0.2959692732744313
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.4707483394795512,
+            "slope": 0.6480179990252911,
+            "cap": 2.641040373971578,
+            "n_players": 16,
+            "local_weight": 0.6003659808363939
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.0753488095596817,
+            "slope": 0.40328265540880415,
+            "cap": 0.7984903361344544,
+            "n_players": 16,
+            "local_weight": 0.7502858571420353
+          },
+          "rating": {
+            "intercept": 2.111551541656812,
+            "slope": 0.7045877063912889,
+            "cap": 9.086178,
+            "n_players": 16,
+            "local_weight": 0.7603449529083618
+          }
+        }
+      },
+      "observed_attack_retention": 1.3891859853105721,
+      "observed_source_ga_p90": 0.25449495733918737,
+      "observed_target_ga_p90": 0.353540828067811,
+      "observed_attack_retention_p10": 1.2320297668183184,
+      "observed_attack_retention_p90": 1.5781456328728514
+    },
+    "24": {
+      "name": "League One",
+      "n_players": 5,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05368569661842809,
+            "slope": 0.5276318314511143,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.1247346153732749
+          },
+          "assists_p90": {
+            "intercept": 0.08872239687406018,
+            "slope": 0.22696818178205344,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.01750204939640042
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.10374541192066199,
+            "slope": 0.7238547476176921,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.1247346153732749
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13400890920847136,
+            "slope": 0.3715530583496694,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.22180275003251002
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.0542975442572763,
+            "slope": 0.29960469836442116,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.375
+          },
+          "minutes_per_app": {
+            "intercept": 43.63943727252983,
+            "slope": 0.30369380956384295,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.03614457831325301
+          },
+          "rating": {
+            "intercept": 3.616296405655267,
+            "slope": 0.46986026348814325,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.13043478260869565
+          }
+        }
+      },
+      "observed_attack_retention": 0.6385904533770814,
+      "observed_source_ga_p90": 0.3443116897893162,
+      "observed_target_ga_p90": 0.21987415808558847,
+      "observed_attack_retention_p10": 0.4688276915959331,
+      "observed_attack_retention_p90": 0.9959642039697839
+    },
+    "34": {
+      "name": "Ligue 1",
+      "n_players": 58,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.040744141282255376,
+            "slope": 0.1649425010871673,
+            "cap": 0.3179928014835843,
+            "n_players": 23,
+            "local_weight": 0.35464127160153586
+          },
+          "assists_p90": {
+            "intercept": 0.035392497641919915,
+            "slope": 0.31841650509901565,
+            "cap": 0.3763254921259843,
+            "n_players": 23,
+            "local_weight": 0.8146846273726549
+          },
+          "xa_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.3410721152305101,
+            "n_players": 13,
+            "local_weight": 0.7108817054116782
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.0983551721468271,
+            "slope": 0.3160143232747389,
+            "cap": 0.857538119266055,
+            "n_players": 23,
+            "local_weight": 0.35464127160153586
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 23,
+            "local_weight": 0.8146846273726549
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19788724378638303,
+            "slope": 0.008205134191581484,
+            "cap": 0.5986744615384634,
+            "n_players": 23,
+            "local_weight": 0.22025634178949563
+          },
+          "minutes_per_app": {
+            "intercept": 50.366729687031395,
+            "slope": 0.3317298313965442,
+            "cap": 90.0,
+            "n_players": 23,
+            "local_weight": 0.5304924126715953
+          },
+          "rating": {
+            "intercept": 3.9351113953612775,
+            "slope": 0.42144491444261845,
+            "cap": 8.6815152,
+            "n_players": 23,
+            "local_weight": 0.8188262738946249
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04417564795189993,
+            "slope": 0.5845287302115998,
+            "cap": 0.7461468835767554,
+            "n_players": 20,
+            "local_weight": 0.48031631574679734
+          },
+          "assists_p90": {
+            "intercept": 0.08887892250569497,
+            "slope": 0.26030107648767326,
+            "cap": 0.688246597338624,
+            "n_players": 20,
+            "local_weight": 0.10356586904165038
+          },
+          "xg_p90": {
+            "intercept": 0.038220446288119866,
+            "slope": 0.5072515717267435,
+            "cap": 0.48207985293272815,
+            "n_players": 11,
+            "local_weight": 0.5016148409909981
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09711822887603203,
+            "slope": 0.7459221371910134,
+            "cap": 1.9375285437376446,
+            "n_players": 20,
+            "local_weight": 0.48031631574679734
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.11108777630435712,
+            "slope": 0.45033593863615845,
+            "cap": 0.8837269374034704,
+            "n_players": 20,
+            "local_weight": 0.6489374070088324
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.0373678844604156,
+            "slope": 0.6223407049973013,
+            "cap": 0.46361030769230743,
+            "n_players": 20,
+            "local_weight": 0.7991525419438598
+          },
+          "minutes_per_app": {
+            "intercept": 44.07276218525028,
+            "slope": 0.3035245705257136,
+            "cap": 90.0,
+            "n_players": 20,
+            "local_weight": 0.19915522660642726
+          },
+          "rating": {
+            "intercept": 3.2305168803683464,
+            "slope": 0.5288650012414884,
+            "cap": 9.013146900000002,
+            "n_players": 20,
+            "local_weight": 0.4986779475073475
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.22138453287302914,
+            "slope": 0.5454783958426445,
+            "cap": 1.2248013266483273,
+            "n_players": 13,
+            "local_weight": 0.7041292181443141
+          },
+          "assists_p90": {
+            "intercept": 0.10889132245744021,
+            "slope": 0.16452939282234977,
+            "cap": 0.7988342479457287,
+            "n_players": 13,
+            "local_weight": 0.7041292181443141
+          },
+          "xg_p90": {
+            "intercept": 0.07326896245722431,
+            "slope": 0.8671849658061513,
+            "cap": 1.0778125852367528,
+            "n_players": 5,
+            "local_weight": 0.19026621164004345
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.5972063350841519,
+            "slope": 0.48654319897510856,
+            "cap": 2.641040373971578,
+            "n_players": 13,
+            "local_weight": 0.5433637581796554
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.09710285659633297,
+            "slope": 0.2678207613980307,
+            "cap": 0.7984903361344544,
+            "n_players": 13,
+            "local_weight": 0.7041292181443141
+          },
+          "rating": {
+            "intercept": 5.180178273458318,
+            "slope": 0.25,
+            "cap": 9.086178,
+            "n_players": 13,
+            "local_weight": 0.7201934583860389
+          }
+        }
+      },
+      "observed_attack_retention": 1.3175104009231347,
+      "observed_source_ga_p90": 0.200649676446078,
+      "observed_target_ga_p90": 0.2643580356595695,
+      "observed_attack_retention_p10": 1.113270467619469,
+      "observed_attack_retention_p90": 1.5392195455238242
+    },
+    "35": {
+      "name": "Bundesliga",
+      "n_players": 23,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03561724489288851,
+            "slope": 0.19755701861470143,
+            "cap": 0.3179928014835843,
+            "n_players": 6,
+            "local_weight": 0.1155095883431725
+          },
+          "assists_p90": {
+            "intercept": 0.04359196898329465,
+            "slope": 0.6075051764590271,
+            "cap": 0.3763254921259843,
+            "n_players": 6,
+            "local_weight": 0.5109441045028855
+          },
+          "xa_p90": {
+            "intercept": -0.0,
+            "slope": 1.0,
+            "cap": 0.3410721152305101,
+            "n_players": 3,
+            "local_weight": 0.35308668570486185
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.06265082579829519,
+            "slope": 0.5560148364593922,
+            "cap": 0.857538119266055,
+            "n_players": 6,
+            "local_weight": 0.1155095883431725
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 6,
+            "local_weight": 0.5109441045028855
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19534494037287922,
+            "slope": 0.011779454940967597,
+            "cap": 0.5986744615384634,
+            "n_players": 6,
+            "local_weight": 0.06249037037795683
+          },
+          "minutes_per_app": {
+            "intercept": 40.01197468337311,
+            "slope": 0.4733793346197023,
+            "cap": 90.0,
+            "n_players": 6,
+            "local_weight": 0.2104990000751671
+          },
+          "rating": {
+            "intercept": 6.513198653092637,
+            "slope": 0.061927914347094916,
+            "cap": 8.6815152,
+            "n_players": 6,
+            "local_weight": 0.5160879855643559
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.052733349388423736,
+            "slope": 0.600934228980113,
+            "cap": 0.7461468835767554,
+            "n_players": 12,
+            "local_weight": 0.34455528837002514
+          },
+          "assists_p90": {
+            "intercept": 0.08885398200364406,
+            "slope": 0.23153391572032436,
+            "cap": 0.688246597338624,
+            "n_players": 12,
+            "local_weight": 0.06165861168452921
+          },
+          "xg_p90": {
+            "intercept": 0.05915440970847551,
+            "slope": 0.3900482355608151,
+            "cap": 0.48207985293272815,
+            "n_players": 6,
+            "local_weight": 0.3483158729878559
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.16507959739988595,
+            "slope": 0.5986319411663269,
+            "cap": 1.9375285437376446,
+            "n_players": 12,
+            "local_weight": 0.34455528837002514
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12649416697462412,
+            "slope": 0.2936526375062939,
+            "cap": 0.8837269374034704,
+            "n_players": 12,
+            "local_weight": 0.5125193308900252
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.06789122868791725,
+            "slope": 0.4850789768831274,
+            "cap": 0.46361030769230743,
+            "n_players": 12,
+            "local_weight": 0.7016179125230465
+          },
+          "minutes_per_app": {
+            "intercept": 46.01075404308946,
+            "slope": 0.27838975275286487,
+            "cap": 90.0,
+            "n_players": 12,
+            "local_weight": 0.1281322754032303
+          },
+          "rating": {
+            "intercept": 3.518136827919692,
+            "slope": 0.49096168077985486,
+            "cap": 9.013146900000002,
+            "n_players": 12,
+            "local_weight": 0.3702183448485382
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.15788593312790852,
+            "slope": 0.6181361176793811,
+            "cap": 1.2248013266483273,
+            "n_players": 4,
+            "local_weight": 0.41938744841902453
+          },
+          "assists_p90": {
+            "intercept": 0.0866801730266463,
+            "slope": 0.5234986224455269,
+            "cap": 0.7988342479457287,
+            "n_players": 4,
+            "local_weight": 0.41938744841902453
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.4500282437067972,
+            "slope": 0.5645992445646191,
+            "cap": 2.641040373971578,
+            "n_players": 4,
+            "local_weight": 0.2653322270530756
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.04984537192978915,
+            "slope": 0.5427809675877947,
+            "cap": 0.7984903361344544,
+            "n_players": 4,
+            "local_weight": 0.41938744841902453
+          },
+          "rating": {
+            "intercept": 2.9531420017356056,
+            "slope": 0.5700577298661401,
+            "cap": 9.086178,
+            "n_players": 4,
+            "local_weight": 0.4418741565881957
+          }
+        }
+      },
+      "observed_attack_retention": 1.1603180428507982,
+      "observed_source_ga_p90": 0.2870390699858357,
+      "observed_target_ga_p90": 0.3330566119076782,
+      "observed_attack_retention_p10": 0.9654892789767998,
+      "observed_attack_retention_p90": 1.4290913922717363
+    },
+    "36": {
+      "name": "Scottish Premiership",
+      "n_players": 8,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.031613330169283714,
+            "slope": 0.23252253193563455,
+            "cap": 0.3179928014835843,
+            "n_players": 3,
+            "local_weight": 0.0693749227437016
+          },
+          "assists_p90": {
+            "intercept": 0.0202358810115388,
+            "slope": 0.7389854316125213,
+            "cap": 0.3763254921259843,
+            "n_players": 3,
+            "local_weight": 0.3735798630067443
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 3,
+            "local_weight": 0.3735798630067443
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19870151658382365,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 3,
+            "local_weight": 0.035974507274468506
+          },
+          "minutes_per_app": {
+            "intercept": 46.81487965625061,
+            "slope": 0.38020607580377375,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.12988083226272568
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05580259308854164,
+            "slope": 0.5204675140876668,
+            "cap": 0.7461468835767554,
+            "n_players": 4,
+            "local_weight": 0.15019930875917706
+          },
+          "assists_p90": {
+            "intercept": 0.0881068696018085,
+            "slope": 0.23951840073185587,
+            "cap": 0.688246597338624,
+            "n_players": 4,
+            "local_weight": 0.02161575053497866
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.07390405674745415,
+            "slope": 0.7639345345209301,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.11805817924312506
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.10831665949504067,
+            "slope": 0.3805283480868732,
+            "cap": 0.8837269374034704,
+            "n_players": 4,
+            "local_weight": 0.261170925100295
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.03387719995091132,
+            "slope": 0.5144653330736697,
+            "cap": 0.46361030769230743,
+            "n_players": 4,
+            "local_weight": 0.43593929369360473
+          },
+          "minutes_per_app": {
+            "intercept": 42.97119084656809,
+            "slope": 0.31295872410292924,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.046077942427932166
+          },
+          "rating": {
+            "intercept": 3.8215735645635522,
+            "slope": 0.4387715806512841,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.12527798369162343
+          }
+        }
+      },
+      "observed_attack_retention": 0.9075655283076645,
+      "observed_source_ga_p90": 0.2703076103689459,
+      "observed_target_ga_p90": 0.2453218692100747,
+      "observed_attack_retention_p10": 0.7498885282229985,
+      "observed_attack_retention_p90": 1.0705886595417469
+    },
+    "37": {
+      "name": "VriendenLoterij Eredivisie",
+      "n_players": 27,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.033361251089437896,
+            "slope": 0.17407900749525893,
+            "cap": 0.3179928014835843,
+            "n_players": 9,
+            "local_weight": 0.1783435389914706
+          },
+          "assists_p90": {
+            "intercept": 0.017957954142480706,
+            "slope": 0.4161326964236903,
+            "cap": 0.3763254921259843,
+            "n_players": 9,
+            "local_weight": 0.6345602576114313
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08841882401827134,
+            "slope": 0.34700655597907454,
+            "cap": 0.857538119266055,
+            "n_players": 9,
+            "local_weight": 0.1783435389914706
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 9,
+            "local_weight": 0.6345602576114313
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19472013103866867,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 9,
+            "local_weight": 0.09916346560769836
+          },
+          "minutes_per_app": {
+            "intercept": 44.002819534881965,
+            "slope": 0.4263943569837263,
+            "cap": 90.0,
+            "n_players": 9,
+            "local_weight": 0.3057085149932518
+          },
+          "rating": {
+            "intercept": 6.843508288552191,
+            "slope": 0.0,
+            "cap": 8.6815152,
+            "n_players": 9,
+            "local_weight": 0.6378476689620868
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04076975599658649,
+            "slope": 0.5525569126524044,
+            "cap": 0.7461468835767554,
+            "n_players": 9,
+            "local_weight": 0.2869029779382232
+          },
+          "assists_p90": {
+            "intercept": 0.08805441775232832,
+            "slope": 0.24894121878817216,
+            "cap": 0.688246597338624,
+            "n_players": 9,
+            "local_weight": 0.047883568285858956
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09867872513368597,
+            "slope": 0.7045704753083999,
+            "cap": 1.9375285437376446,
+            "n_players": 9,
+            "local_weight": 0.2869029779382232
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14586892681933808,
+            "slope": 0.36092174115831266,
+            "cap": 0.8837269374034704,
+            "n_players": 9,
+            "local_weight": 0.44588128686729295
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.04386936575875045,
+            "slope": 0.45402121124272465,
+            "cap": 0.46361030769230743,
+            "n_players": 9,
+            "local_weight": 0.6420213523385214
+          },
+          "minutes_per_app": {
+            "intercept": 45.71310735675584,
+            "slope": 0.2645133507650289,
+            "cap": 90.0,
+            "n_players": 9,
+            "local_weight": 0.10079334928481021
+          },
+          "rating": {
+            "intercept": 3.262354388728726,
+            "slope": 0.5200527114098378,
+            "cap": 9.013146900000002,
+            "n_players": 9,
+            "local_weight": 0.30956662596562157
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.12657272676276834,
+            "slope": 0.4301134629386446,
+            "cap": 1.2248013266483273,
+            "n_players": 8,
+            "local_weight": 0.5958512263459126
+          },
+          "assists_p90": {
+            "intercept": 0.036254247470400514,
+            "slope": 0.6698958938105408,
+            "cap": 0.7988342479457287,
+            "n_players": 8,
+            "local_weight": 0.5958512263459126
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.5295082321173954,
+            "slope": 0.435322220980686,
+            "cap": 2.641040373971578,
+            "n_players": 8,
+            "local_weight": 0.4243504944246747
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.18704452017027015,
+            "slope": 0.0,
+            "cap": 0.7984903361344544,
+            "n_players": 8,
+            "local_weight": 0.5958512263459126
+          },
+          "rating": {
+            "intercept": 2.4963414425427652,
+            "slope": 0.6231215109880175,
+            "cap": 9.086178,
+            "n_players": 8,
+            "local_weight": 0.6127784176800621
+          }
+        }
+      },
+      "observed_attack_retention": 0.7207088524588009,
+      "observed_source_ga_p90": 0.293220089417618,
+      "observed_target_ga_p90": 0.21132631416203845,
+      "observed_attack_retention_p10": 0.5986327296491074,
+      "observed_attack_retention_p90": 0.8394031567579986
+    },
+    "38": {
+      "name": "Pro League",
+      "n_players": 40,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03963770408446422,
+            "slope": 0.11927729977476642,
+            "cap": 0.3179928014835843,
+            "n_players": 11,
+            "local_weight": 0.20990551045280006
+          },
+          "assists_p90": {
+            "intercept": 0.03850777687261653,
+            "slope": 0.4420767092686065,
+            "cap": 0.3763254921259843,
+            "n_players": 11,
+            "local_weight": 0.6800380076948912
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.0735403058131069,
+            "slope": 0.4495609601076017,
+            "cap": 0.857538119266055,
+            "n_players": 4,
+            "local_weight": 0.08577019811838313
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 11,
+            "local_weight": 0.6800380076948912
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19948619033893641,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 11,
+            "local_weight": 0.11948891451357181
+          },
+          "minutes_per_app": {
+            "intercept": 43.8930715920099,
+            "slope": 0.42890120522562436,
+            "cap": 90.0,
+            "n_players": 11,
+            "local_weight": 0.35183464028610734
+          },
+          "rating": {
+            "intercept": 6.851931171597889,
+            "slope": 0.0,
+            "cap": 8.6815152,
+            "n_players": 4,
+            "local_weight": 0.44143807110008815
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.07438899144622434,
+            "slope": 0.4511856146914709,
+            "cap": 0.7461468835767554,
+            "n_players": 10,
+            "local_weight": 0.32737007959481734
+          },
+          "assists_p90": {
+            "intercept": 0.09128383809033797,
+            "slope": 0.21873246434197516,
+            "cap": 0.688246597338624,
+            "n_players": 10,
+            "local_weight": 0.057348738361024144
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.12488423849404076,
+            "slope": 0.6811642171064347,
+            "cap": 1.9375285437376446,
+            "n_players": 5,
+            "local_weight": 0.1952799288016691
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12673829709008694,
+            "slope": 0.4827659291785236,
+            "cap": 0.8837269374034704,
+            "n_players": 10,
+            "local_weight": 0.49326120066643026
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.042220997049190585,
+            "slope": 0.42176826619273794,
+            "cap": 0.46361030769230743,
+            "n_players": 10,
+            "local_weight": 0.6640732837994945
+          },
+          "minutes_per_app": {
+            "intercept": 43.97196314854497,
+            "slope": 0.29844743920544614,
+            "cap": 90.0,
+            "n_players": 10,
+            "local_weight": 0.10996592129261637
+          },
+          "rating": {
+            "intercept": 3.281773032759511,
+            "slope": 0.5161304438538259,
+            "cap": 9.013146900000002,
+            "n_players": 5,
+            "local_weight": 0.19675816080198624
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.16891911898837217,
+            "slope": 0.6342055829143557,
+            "cap": 1.2248013266483273,
+            "n_players": 18,
+            "local_weight": 0.7720800665720797
+          },
+          "assists_p90": {
+            "intercept": 0.09583535815961518,
+            "slope": 0.09879299421454563,
+            "cap": 0.7988342479457287,
+            "n_players": 18,
+            "local_weight": 0.7720800665720797
+          },
+          "xg_p90": {
+            "intercept": 0.042140550959968714,
+            "slope": 0.9058175625916276,
+            "cap": 1.0778125852367528,
+            "n_players": 7,
+            "local_weight": 0.24161590597099442
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.3704557121465098,
+            "slope": 0.6363754551547252,
+            "cap": 2.641040373971578,
+            "n_players": 13,
+            "local_weight": 0.5480616286104814
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.09394140725106714,
+            "slope": 0.49842457484808633,
+            "cap": 0.7984903361344544,
+            "n_players": 18,
+            "local_weight": 0.7720800665720797
+          },
+          "rating": {
+            "intercept": 2.979224299653542,
+            "slope": 0.5774665294646324,
+            "cap": 9.086178,
+            "n_players": 13,
+            "local_weight": 0.7184177713258757
+          }
+        }
+      },
+      "observed_attack_retention": 1.326106404039666,
+      "observed_source_ga_p90": 0.2643315242005448,
+      "observed_target_ga_p90": 0.3505317270319084,
+      "observed_attack_retention_p10": 1.1472602314362526,
+      "observed_attack_retention_p90": 1.5409686815622825
+    },
+    "39": {
+      "name": "Danish Superliga",
+      "n_players": 9,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03134480149306462,
+            "slope": 0.20590982790863382,
+            "cap": 0.3179928014835843,
+            "n_players": 3,
+            "local_weight": 0.06482943165086787
+          },
+          "assists_p90": {
+            "intercept": 0.011939657734264444,
+            "slope": 0.4658853321681645,
+            "cap": 0.3763254921259843,
+            "n_players": 3,
+            "local_weight": 0.35674322813151077
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 3,
+            "local_weight": 0.35674322813151077
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.1952197042787607,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 3,
+            "local_weight": 0.03614457831325301
+          },
+          "minutes_per_app": {
+            "intercept": 38.595762812326186,
+            "slope": 0.47072129895768133,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.13043478260869565
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.22119778376578814,
+            "slope": 0.3769163133393382,
+            "cap": 1.2248013266483273,
+            "n_players": 5,
+            "local_weight": 0.47915316331889535
+          },
+          "assists_p90": {
+            "intercept": 0.06890799018628152,
+            "slope": 0.04689305245737382,
+            "cap": 0.7988342479457287,
+            "n_players": 5,
+            "local_weight": 0.47915316331889535
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.507746729656292,
+            "slope": 0.478421606353895,
+            "cap": 2.641040373971578,
+            "n_players": 4,
+            "local_weight": 0.2683285537826698
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.08900380902731093,
+            "slope": 0.28653138590860844,
+            "cap": 0.7984903361344544,
+            "n_players": 5,
+            "local_weight": 0.47915316331889535
+          },
+          "rating": {
+            "intercept": 4.978582660797792,
+            "slope": 0.27256501440920466,
+            "cap": 9.086178,
+            "n_players": 4,
+            "local_weight": 0.4411764705882353
+          }
+        }
+      },
+      "observed_attack_retention": 0.7095425548293468,
+      "observed_source_ga_p90": 0.33754115548176367,
+      "observed_target_ga_p90": 0.2394998138205804,
+      "observed_attack_retention_p10": 0.4457570387695184,
+      "observed_attack_retention_p90": 0.9737448998340368
+    },
+    "40": {
+      "name": "Allsvenskan",
+      "n_players": 10,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04352653331116527,
+            "slope": 0.5492666112992737,
+            "cap": 0.7461468835767554,
+            "n_players": 5,
+            "local_weight": 0.19629244557009976
+          },
+          "assists_p90": {
+            "intercept": 0.08529684943894225,
+            "slope": 0.24073439173207428,
+            "cap": 0.688246597338624,
+            "n_players": 5,
+            "local_weight": 0.029624787422303466
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.06767963404367966,
+            "slope": 0.7418935604651795,
+            "cap": 1.9375285437376446,
+            "n_players": 5,
+            "local_weight": 0.19629244557009976
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13231892507951837,
+            "slope": 0.354477693525858,
+            "cap": 0.8837269374034704,
+            "n_players": 5,
+            "local_weight": 0.32816799319760903
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.07143713429016744,
+            "slope": 0.2845057481614136,
+            "cap": 0.46361030769230743,
+            "n_players": 5,
+            "local_weight": 0.499839820599071
+          },
+          "minutes_per_app": {
+            "intercept": 44.85429736818874,
+            "slope": 0.28936501827970906,
+            "cap": 90.0,
+            "n_players": 5,
+            "local_weight": 0.058788067180979835
+          },
+          "rating": {
+            "intercept": 3.853913120938694,
+            "slope": 0.43459243777945644,
+            "cap": 9.013146900000002,
+            "n_players": 5,
+            "local_weight": 0.19989750488453287
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.13319301466488398,
+            "slope": 0.5289955394595887,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.3529455773816318
+          },
+          "assists_p90": {
+            "intercept": 0.06473762445282824,
+            "slope": 0.3385788195652517,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.3529455773816318
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.47789506070585497,
+            "slope": 0.4866906813658751,
+            "cap": 2.641040373971578,
+            "n_players": 3,
+            "local_weight": 0.21428895884359694
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.10369976259708016,
+            "slope": 0.28632568577593115,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.3529455773816318
+          },
+          "rating": {
+            "intercept": 4.142598318889881,
+            "slope": 0.3895530420022369,
+            "cap": 9.086178,
+            "n_players": 3,
+            "local_weight": 0.3713001674913378
+          }
+        }
+      },
+      "observed_attack_retention": 0.7336839481771766,
+      "observed_source_ga_p90": 0.24398171447783362,
+      "observed_target_ga_p90": 0.17900546756113359,
+      "observed_attack_retention_p10": 0.6012416962166632,
+      "observed_attack_retention_p90": 0.9481030790011549
+    },
+    "41": {
+      "name": "Veikkausliiga",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.8322177599286034,
+      "observed_source_ga_p90": 0.21919142717973697,
+      "observed_target_ga_p90": 0.40160642570281124
+    },
+    "44": {
+      "name": "2. Bundesliga",
+      "n_players": 14,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.04198349906105859,
+            "slope": 0.15413815489871355,
+            "cap": 0.3179928014835843,
+            "n_players": 6,
+            "local_weight": 0.11755418328916607
+          },
+          "assists_p90": {
+            "intercept": 0.008411197623005403,
+            "slope": 0.5073419134671551,
+            "cap": 0.3763254921259843,
+            "n_players": 6,
+            "local_weight": 0.5159055100747794
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08433096203067435,
+            "slope": 0.387820626901343,
+            "cap": 0.857538119266055,
+            "n_players": 6,
+            "local_weight": 0.11755418328916607
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 6,
+            "local_weight": 0.5159055100747794
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.194756466706318,
+            "slope": 0.01290149032665609,
+            "cap": 0.5986744615384634,
+            "n_players": 6,
+            "local_weight": 0.06731180201485212
+          },
+          "minutes_per_app": {
+            "intercept": 28.34346705720975,
+            "slope": 0.607575929894902,
+            "cap": 90.0,
+            "n_players": 6,
+            "local_weight": 0.22401137923498973
+          },
+          "rating": {
+            "intercept": 4.528130311515761,
+            "slope": 0.3320239803742972,
+            "cap": 8.6815152,
+            "n_players": 6,
+            "local_weight": 0.5359014488602901
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.044641710093205146,
+            "slope": 0.54100997301772,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.1174438267249044
+          },
+          "assists_p90": {
+            "intercept": 0.08773084020113846,
+            "slope": 0.23242907159736517,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.0163618799055712
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08978107032406327,
+            "slope": 0.7009241358408127,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.1174438267249044
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12878717824381203,
+            "slope": 0.39410419112605877,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.2102008600631288
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.031871106584471134,
+            "slope": 0.7494904200956156,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.3737945293003898
+          },
+          "minutes_per_app": {
+            "intercept": 41.996441423419036,
+            "slope": 0.32826545429003273,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.03596570556497822
+          },
+          "rating": {
+            "intercept": 3.1384027523932634,
+            "slope": 0.5379069007022584,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.12985214970960726
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.03182566240382649,
+            "slope": 0.7591402159884638,
+            "cap": 1.2248013266483273,
+            "n_players": 5,
+            "local_weight": 0.471979497752535
+          },
+          "assists_p90": {
+            "intercept": 0.07451896979595704,
+            "slope": 0.2983102552200006,
+            "cap": 0.7988342479457287,
+            "n_players": 5,
+            "local_weight": 0.471979497752535
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.32340633973154465,
+            "slope": 0.644153828091171,
+            "cap": 2.641040373971578,
+            "n_players": 5,
+            "local_weight": 0.3088829613597013
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.08630527011285095,
+            "slope": 0.4164750149288146,
+            "cap": 0.7984903361344544,
+            "n_players": 5,
+            "local_weight": 0.471979497752535
+          },
+          "rating": {
+            "intercept": 2.7858916748009377,
+            "slope": 0.5820541431595292,
+            "cap": 9.086178,
+            "n_players": 5,
+            "local_weight": 0.489959150011477
+          }
+        }
+      },
+      "observed_attack_retention": 0.7987061280367045,
+      "observed_source_ga_p90": 0.3060801737245662,
+      "observed_target_ga_p90": 0.24446811042435013,
+      "observed_attack_retention_p10": 0.702447436277744,
+      "observed_attack_retention_p90": 0.9417240804460204
+    },
+    "45": {
+      "name": "Austrian Bundesliga",
+      "n_players": 13,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.037220800348716304,
+            "slope": 0.1961514016510072,
+            "cap": 0.3179928014835843,
+            "n_players": 4,
+            "local_weight": 0.08810042413699733
+          },
+          "assists_p90": {
+            "intercept": 0.032577879498536085,
+            "slope": 0.41592796332855114,
+            "cap": 0.3763254921259843,
+            "n_players": 4,
+            "local_weight": 0.4359510724161111
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08050872772681908,
+            "slope": 0.41812829712274496,
+            "cap": 0.857538119266055,
+            "n_players": 4,
+            "local_weight": 0.08810042413699733
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 4,
+            "local_weight": 0.4359510724161111
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.1965522990887699,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 4,
+            "local_weight": 0.04660417697924253
+          },
+          "minutes_per_app": {
+            "intercept": 48.35852344685921,
+            "slope": 0.36905806939442926,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.16355032328307925
+          },
+          "rating": {
+            "intercept": 2.7018887404401477,
+            "slope": 0.5999844784426274,
+            "cap": 8.6815152,
+            "n_players": 4,
+            "local_weight": 0.4388695317445653
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04681293759696731,
+            "slope": 0.535484134448877,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.12528415093751094
+          },
+          "assists_p90": {
+            "intercept": 0.08926577874513773,
+            "slope": 0.20513834901759684,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.01758865063276897
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.0882964147456246,
+            "slope": 0.7502258448610386,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.12528415093751094
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12188869381095863,
+            "slope": 0.3801991335625613,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.22267113747782302
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.043023640048209834,
+            "slope": 0.46606161347997244,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.3691513130201082
+          },
+          "minutes_per_app": {
+            "intercept": 42.7995568538268,
+            "slope": 0.3122224865170175,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.03528250296715932
+          },
+          "rating": {
+            "intercept": 3.509389203243563,
+            "slope": 0.4831167854051412,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.1276215850129575
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.20243984867983897,
+            "slope": 0.4333054618116384,
+            "cap": 1.2248013266483273,
+            "n_players": 6,
+            "local_weight": 0.526964351198929
+          },
+          "assists_p90": {
+            "intercept": 0.11138360371227711,
+            "slope": 0.0,
+            "cap": 0.7988342479457287,
+            "n_players": 6,
+            "local_weight": 0.526964351198929
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.6091420898599813,
+            "slope": 0.35910567885489647,
+            "cap": 2.641040373971578,
+            "n_players": 6,
+            "local_weight": 0.3577403925205981
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13969035480099193,
+            "slope": 0.34114957510248184,
+            "cap": 0.7984903361344544,
+            "n_players": 6,
+            "local_weight": 0.526964351198929
+          },
+          "rating": {
+            "intercept": 4.284918137350207,
+            "slope": 0.3733799356587789,
+            "cap": 9.086178,
+            "n_players": 6,
+            "local_weight": 0.540701251067222
+          }
+        }
+      },
+      "observed_attack_retention": 0.7054333910310443,
+      "observed_source_ga_p90": 0.4232753839006303,
+      "observed_target_ga_p90": 0.29859258940498873,
+      "observed_attack_retention_p10": 0.5308689931279222,
+      "observed_attack_retention_p90": 0.9204710585628234
+    },
+    "53": {
+      "name": "Serie B",
+      "n_players": 18,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03092252167505056,
+            "slope": 0.22037977558735142,
+            "cap": 0.3179928014835843,
+            "n_players": 4,
+            "local_weight": 0.08951018900777184
+          },
+          "assists_p90": {
+            "intercept": 0.014039405679827721,
+            "slope": 0.49118207389912916,
+            "cap": 0.3763254921259843,
+            "n_players": 4,
+            "local_weight": 0.4402398480243122
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.06602588038052032,
+            "slope": 0.44282080045631256,
+            "cap": 0.857538119266055,
+            "n_players": 4,
+            "local_weight": 0.08951018900777184
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 4,
+            "local_weight": 0.4402398480243122
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19505612689306653,
+            "slope": 0.0010827207958090696,
+            "cap": 0.5986744615384634,
+            "n_players": 4,
+            "local_weight": 0.04713148454057433
+          },
+          "minutes_per_app": {
+            "intercept": 39.78029610189362,
+            "slope": 0.4701141754352288,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.1651715912619792
+          },
+          "rating": {
+            "intercept": 2.1575290123402713,
+            "slope": 0.6728209590429929,
+            "cap": 8.6815152,
+            "n_players": 4,
+            "local_weight": 0.4417785612210107
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.057797242486862986,
+            "slope": 0.5514250147044217,
+            "cap": 0.7461468835767554,
+            "n_players": 9,
+            "local_weight": 0.29846806801220416
+          },
+          "assists_p90": {
+            "intercept": 0.08853830957301943,
+            "slope": 0.21877082904443854,
+            "cap": 0.688246597338624,
+            "n_players": 9,
+            "local_weight": 0.05049602926014273
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.10790020023621322,
+            "slope": 0.7146972087398296,
+            "cap": 1.9375285437376446,
+            "n_players": 6,
+            "local_weight": 0.2304215443533045
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14941217905015935,
+            "slope": 0.28509720644903863,
+            "cap": 0.8837269374034704,
+            "n_players": 9,
+            "local_weight": 0.4597233853723061
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.059627979056910814,
+            "slope": 0.28169249022838594,
+            "cap": 0.46361030769230743,
+            "n_players": 9,
+            "local_weight": 0.6419318515154095
+          },
+          "minutes_per_app": {
+            "intercept": 43.82577181389214,
+            "slope": 0.3119170436866976,
+            "cap": 90.0,
+            "n_players": 9,
+            "local_weight": 0.10075806183313135
+          },
+          "rating": {
+            "intercept": 3.629646886540413,
+            "slope": 0.4688598712517628,
+            "cap": 9.013146900000002,
+            "n_players": 6,
+            "local_weight": 0.23076923076923078
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.10892333281453798,
+            "slope": 0.660747128674298,
+            "cap": 1.2248013266483273,
+            "n_players": 5,
+            "local_weight": 0.4949990950258687
+          },
+          "assists_p90": {
+            "intercept": 0.1203224236142261,
+            "slope": 0.42266616180016503,
+            "cap": 0.7988342479457287,
+            "n_players": 5,
+            "local_weight": 0.4949990950258687
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.33717462548825256,
+            "slope": 0.6953676430066295,
+            "cap": 2.641040373971578,
+            "n_players": 5,
+            "local_weight": 0.3289028554001946
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.06927202643865359,
+            "slope": 0.3866434826304298,
+            "cap": 0.7984903361344544,
+            "n_players": 5,
+            "local_weight": 0.4949990950258687
+          },
+          "rating": {
+            "intercept": 3.6141695933651037,
+            "slope": 0.4789172723097556,
+            "cap": 9.086178,
+            "n_players": 5,
+            "local_weight": 0.49470704069259386
+          }
+        }
+      },
+      "observed_attack_retention": 0.9703888735374531,
+      "observed_source_ga_p90": 0.2815677692710368,
+      "observed_target_ga_p90": 0.27323023044737493,
+      "observed_attack_retention_p10": 0.8214079026564935,
+      "observed_attack_retention_p90": 1.168993163247406
+    },
+    "54": {
+      "name": "LaLiga 2",
+      "n_players": 13,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.029105817885930804,
+            "slope": 0.22673629295390793,
+            "cap": 0.3179928014835843,
+            "n_players": 4,
+            "local_weight": 0.08741016141183826
+          },
+          "assists_p90": {
+            "intercept": 0.017229077802964232,
+            "slope": 0.4406832944445473,
+            "cap": 0.3763254921259843,
+            "n_players": 4,
+            "local_weight": 0.43383200947678846
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.06313407369385766,
+            "slope": 0.45983496449156125,
+            "cap": 0.857538119266055,
+            "n_players": 4,
+            "local_weight": 0.08741016141183826
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 4,
+            "local_weight": 0.43383200947678846
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19652139441365815,
+            "slope": 0.005098092056329624,
+            "cap": 0.5986744615384634,
+            "n_players": 4,
+            "local_weight": 0.04617728350455398
+          },
+          "minutes_per_app": {
+            "intercept": 41.44405114567378,
+            "slope": 0.44789107145913243,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.1622344899133759
+          },
+          "rating": {
+            "intercept": 5.887465745822276,
+            "slope": 0.1386985322004979,
+            "cap": 8.6815152,
+            "n_players": 4,
+            "local_weight": 0.4364945484165289
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.056840245059140045,
+            "slope": 0.5344604413839629,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.1297841293762302
+          },
+          "assists_p90": {
+            "intercept": 0.08739597329584461,
+            "slope": 0.25084206852212837,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.018301336294789528
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.10495154319613943,
+            "slope": 0.718833606593793,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.1297841293762302
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.137027757518131,
+            "slope": 0.42865537458509495,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.22975031424434303
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.04532477109905091,
+            "slope": 0.4928194566505129,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.37334572637766383
+          },
+          "minutes_per_app": {
+            "intercept": 44.67020403913683,
+            "slope": 0.29049961044988915,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.035899269220787226
+          },
+          "rating": {
+            "intercept": 3.014571977957344,
+            "slope": 0.5585237380071647,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.12963560629066337
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.16136302930981053,
+            "slope": 0.507511297713201,
+            "cap": 1.2248013266483273,
+            "n_players": 4,
+            "local_weight": 0.42520807363029683
+          },
+          "assists_p90": {
+            "intercept": 0.11650730370537571,
+            "slope": 0.23660734644553894,
+            "cap": 0.7988342479457287,
+            "n_players": 4,
+            "local_weight": 0.42520807363029683
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.4888299275271739,
+            "slope": 0.47817529227443356,
+            "cap": 2.641040373971578,
+            "n_players": 4,
+            "local_weight": 0.2700090510436574
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.0834752584568551,
+            "slope": 0.4835823200003875,
+            "cap": 0.7984903361344544,
+            "n_players": 4,
+            "local_weight": 0.42520807363029683
+          },
+          "rating": {
+            "intercept": 5.129197428143484,
+            "slope": 0.25,
+            "cap": 9.086178,
+            "n_players": 4,
+            "local_weight": 0.4444444444444444
+          }
+        }
+      },
+      "observed_attack_retention": 1.3449697837530494,
+      "observed_source_ga_p90": 0.19560885033203207,
+      "observed_target_ga_p90": 0.2630879931312558,
+      "observed_attack_retention_p10": 0.9900164582354489,
+      "observed_attack_retention_p90": 1.7526382349270333
+    },
+    "98": {
+      "name": "Trendyol 1.Lig",
+      "n_players": 110,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.020245652145691167,
+            "slope": 0.29914023645538224,
+            "cap": 0.3179928014835843,
+            "n_players": 44,
+            "local_weight": 0.5115333239075063
+          },
+          "assists_p90": {
+            "intercept": 0.017938999276526445,
+            "slope": 0.4367597610584293,
+            "cap": 0.3763254921259843,
+            "n_players": 44,
+            "local_weight": 0.8933649598037379
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.027602236729475566,
+            "slope": 0.5576628066826856,
+            "cap": 0.857538119266055,
+            "n_players": 35,
+            "local_weight": 0.45273570518602196
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 44,
+            "local_weight": 0.8933649598037379
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.1809638569543907,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 44,
+            "local_weight": 0.3500525125991954
+          },
+          "minutes_per_app": {
+            "intercept": 46.50966350399113,
+            "slope": 0.3728055380020827,
+            "cap": 90.0,
+            "n_players": 44,
+            "local_weight": 0.6829768076754624
+          },
+          "rating": {
+            "intercept": 5.770021330156412,
+            "slope": 0.14841585118352343,
+            "cap": 8.6815152,
+            "n_players": 35,
+            "local_weight": 0.8725275323151084
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05755570231174551,
+            "slope": 0.48038309401029683,
+            "cap": 0.7461468835767554,
+            "n_players": 44,
+            "local_weight": 0.6757864757137318
+          },
+          "assists_p90": {
+            "intercept": 0.08566462436694836,
+            "slope": 0.21507229859685084,
+            "cap": 0.688246597338624,
+            "n_players": 44,
+            "local_weight": 0.20669447236411323
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08973370289182123,
+            "slope": 0.6935391404837273,
+            "cap": 1.9375285437376446,
+            "n_players": 35,
+            "local_weight": 0.6236219924606256
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.1530823059248142,
+            "slope": 0.39617292246123975,
+            "cap": 0.8837269374034704,
+            "n_players": 44,
+            "local_weight": 0.8065305282117265
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.02870654692330196,
+            "slope": 0.3808336208886549,
+            "cap": 0.46361030769230743,
+            "n_players": 44,
+            "local_weight": 0.8974426087311801
+          },
+          "minutes_per_app": {
+            "intercept": 40.03518289965338,
+            "slope": 0.35396613304333346,
+            "cap": 90.0,
+            "n_players": 44,
+            "local_weight": 0.353552018422547
+          },
+          "rating": {
+            "intercept": 3.762859048266303,
+            "slope": 0.4447746932672323,
+            "cap": 9.013146900000002,
+            "n_players": 35,
+            "local_weight": 0.6351352768996421
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.22780446761868978,
+            "slope": 0.25,
+            "cap": 1.2248013266483273,
+            "n_players": 14,
+            "local_weight": 0.7174996594357451
+          },
+          "assists_p90": {
+            "intercept": 0.07348419329275835,
+            "slope": 0.23742411070150546,
+            "cap": 0.7988342479457287,
+            "n_players": 14,
+            "local_weight": 0.7174996594357451
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.6883915214255416,
+            "slope": 0.25,
+            "cap": 2.641040373971578,
+            "n_players": 14,
+            "local_weight": 0.5594537769245898
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13834749443175315,
+            "slope": 0.44226373801477864,
+            "cap": 0.7984903361344544,
+            "n_players": 14,
+            "local_weight": 0.7174996594357451
+          },
+          "rating": {
+            "intercept": 4.556662865650524,
+            "slope": 0.32782397866403556,
+            "cap": 9.086178,
+            "n_players": 14,
+            "local_weight": 0.7343762553077159
+          }
+        },
+        "GK": {
+          "red_cards_p90": {
+            "intercept": 0.0014254870858076837,
+            "slope": 0.054635941813352004,
+            "cap": 0.05801540888176059,
+            "n_players": 8,
+            "local_weight": 0.5838212397473883
+          },
+          "saves_p90": {
+            "intercept": 1.038449903665106,
+            "slope": 0.6626083692945266,
+            "cap": 5.022311538461539,
+            "n_players": 8,
+            "local_weight": 0.5838212397473883
+          },
+          "minutes_per_app": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 90.0,
+            "n_players": 8,
+            "local_weight": 0.5861283545582693
+          }
+        }
+      },
+      "observed_attack_retention": 0.7206997204432455,
+      "observed_source_ga_p90": 0.23795249062611154,
+      "observed_target_ga_p90": 0.1714922934730126,
+      "observed_attack_retention_p10": 0.6362485443656033,
+      "observed_attack_retention_p90": 0.820782710306613
+    },
+    "131": {
+      "name": "Eerste Divisie",
+      "n_players": 4,
+      "positions": {
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.11824712791468853,
+            "slope": 0.5246293946654499,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.34501610890121687
+          },
+          "assists_p90": {
+            "intercept": 0.11187520738995649,
+            "slope": 0.20676105925559485,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.34501610890121687
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.47242181378252074,
+            "slope": 0.4491965472339659,
+            "cap": 2.641040373971578,
+            "n_players": 3,
+            "local_weight": 0.20847097712362173
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.07054470923916473,
+            "slope": 0.5279479820157754,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.34501610890121687
+          },
+          "rating": {
+            "intercept": 4.980844280396457,
+            "slope": 0.2661565235464869,
+            "cap": 9.086178,
+            "n_players": 3,
+            "local_weight": 0.3730354358262834
+          }
+        }
+      },
+      "observed_attack_retention": 0.7362458494555641,
+      "observed_source_ga_p90": 0.44713949163817074,
+      "observed_target_ga_p90": 0.3292045948462741,
+      "observed_attack_retention_p10": 0.6181996278694876,
+      "observed_attack_retention_p90": 0.8964056231785168
+    },
+    "135": {
+      "name": "2. Liga",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 0.0,
+      "observed_source_ga_p90": 0.15693112467306017,
+      "observed_target_ga_p90": 0.0
+    },
+    "152": {
+      "name": "SuperLiga României",
+      "n_players": 13,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03236892326494931,
+            "slope": 0.15794853313966983,
+            "cap": 0.3179928014835843,
+            "n_players": 3,
+            "local_weight": 0.06649219550035858
+          },
+          "assists_p90": {
+            "intercept": 0.035175994915499095,
+            "slope": 0.3035669205533835,
+            "cap": 0.3763254921259843,
+            "n_players": 3,
+            "local_weight": 0.3629869631690453
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 3,
+            "local_weight": 0.3629869631690453
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19180136956510077,
+            "slope": 0.029486037745442888,
+            "cap": 0.5986744615384634,
+            "n_players": 3,
+            "local_weight": 0.03611955531433123
+          },
+          "minutes_per_app": {
+            "intercept": 31.230349141028984,
+            "slope": 0.5707733307795474,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.13035331043710713
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05183016735390118,
+            "slope": 0.5473667823494683,
+            "cap": 0.7461468835767554,
+            "n_players": 7,
+            "local_weight": 0.25609048057624717
+          },
+          "assists_p90": {
+            "intercept": 0.08708124608242326,
+            "slope": 0.22776555255259387,
+            "cap": 0.688246597338624,
+            "n_players": 7,
+            "local_weight": 0.04125589732245336
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.14785491211443086,
+            "slope": 0.6825509100946792,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.12750302877998182
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14967260650055308,
+            "slope": 0.32839116358062614,
+            "cap": 0.8837269374034704,
+            "n_players": 7,
+            "local_weight": 0.40775801510534887
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.06379362216649759,
+            "slope": 0.3157831473855669,
+            "cap": 0.46361030769230743,
+            "n_players": 7,
+            "local_weight": 0.5825310369708866
+          },
+          "minutes_per_app": {
+            "intercept": 42.92034796883069,
+            "slope": 0.3197515694571154,
+            "cap": 90.0,
+            "n_players": 7,
+            "local_weight": 0.08021595619626065
+          },
+          "rating": {
+            "intercept": 3.466272027786065,
+            "slope": 0.490354003043465,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.12978344310395262
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.17593687632471267,
+            "slope": 0.31098811139285965,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.3714866834480241
+          },
+          "assists_p90": {
+            "intercept": 0.05478898497033968,
+            "slope": 0.23275307152345726,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.3714866834480241
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.10238324747423026,
+            "slope": 0.586876078144572,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.3714866834480241
+          }
+        }
+      },
+      "observed_attack_retention": 0.5670123523709734,
+      "observed_source_ga_p90": 0.30861546224078196,
+      "observed_target_ga_p90": 0.17498877922320108,
+      "observed_attack_retention_p10": 0.39162299485211005,
+      "observed_attack_retention_p90": 0.7739165709184442
+    },
+    "155": {
+      "name": "Liga Profesional de Fútbol",
+      "n_players": 7,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.06063177392546616,
+            "slope": 0.5225321389056788,
+            "cap": 0.7461468835767554,
+            "n_players": 4,
+            "local_weight": 0.16187491135261756
+          },
+          "assists_p90": {
+            "intercept": 0.08579202530360634,
+            "slope": 0.2305712651365796,
+            "cap": 0.688246597338624,
+            "n_players": 4,
+            "local_weight": 0.02357329887680188
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09544741231547957,
+            "slope": 0.7584169191010597,
+            "cap": 1.9375285437376446,
+            "n_players": 4,
+            "local_weight": 0.16187491135261756
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.15413621386370358,
+            "slope": 0.2684254233553822,
+            "cap": 0.8837269374034704,
+            "n_players": 4,
+            "local_weight": 0.27864430115659866
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.048634467388344024,
+            "slope": 0.39526367527718137,
+            "cap": 0.46361030769230743,
+            "n_players": 4,
+            "local_weight": 0.442380710185986
+          },
+          "minutes_per_app": {
+            "intercept": 43.35579782847848,
+            "slope": 0.31365552578560707,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.04724124744370262
+          },
+          "rating": {
+            "intercept": 3.2716829249940016,
+            "slope": 0.5202877404524302,
+            "cap": 9.013146900000002,
+            "n_players": 4,
+            "local_weight": 0.16550850505131154
+          }
+        }
+      },
+      "observed_attack_retention": 0.9801071250790602,
+      "observed_source_ga_p90": 0.17210147892185937,
+      "observed_target_ga_p90": 0.16867788572795805,
+      "observed_attack_retention_p10": 0.84170177296538,
+      "observed_attack_retention_p90": 1.2372837639489283
+    },
+    "170": {
+      "name": "HNL",
+      "n_players": 18,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.0372937027236376,
+            "slope": 0.12467267090831763,
+            "cap": 0.3179928014835843,
+            "n_players": 5,
+            "local_weight": 0.10665899375259127
+          },
+          "assists_p90": {
+            "intercept": 0.017882103193576294,
+            "slope": 0.4606849800384845,
+            "cap": 0.3763254921259843,
+            "n_players": 5,
+            "local_weight": 0.4885294975962245
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 5,
+            "local_weight": 0.4885294975962245
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19967273258160945,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 5,
+            "local_weight": 0.05639511033371713
+          },
+          "minutes_per_app": {
+            "intercept": 43.81031343192089,
+            "slope": 0.43216887518029135,
+            "cap": 90.0,
+            "n_players": 5,
+            "local_weight": 0.192938138508553
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.06776281183188956,
+            "slope": 0.4111031970700951,
+            "cap": 0.7461468835767554,
+            "n_players": 9,
+            "local_weight": 0.2942805270373279
+          },
+          "assists_p90": {
+            "intercept": 0.09265745542013287,
+            "slope": 0.18809491073701737,
+            "cap": 0.688246597338624,
+            "n_players": 9,
+            "local_weight": 0.04954187342345236
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09817135329566863,
+            "slope": 0.6844823242569651,
+            "cap": 1.9375285437376446,
+            "n_players": 5,
+            "local_weight": 0.1911308445993475
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.1338751757755563,
+            "slope": 0.38767902527470044,
+            "cap": 0.8837269374034704,
+            "n_players": 9,
+            "local_weight": 0.45473994376002946
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.02303881055916742,
+            "slope": 0.30755899371633577,
+            "cap": 0.46361030769230743,
+            "n_players": 9,
+            "local_weight": 0.642174815589177
+          },
+          "minutes_per_app": {
+            "intercept": 44.469418920660374,
+            "slope": 0.27029229716739855,
+            "cap": 90.0,
+            "n_players": 9,
+            "local_weight": 0.10085388980717244
+          },
+          "rating": {
+            "intercept": 4.08789561437642,
+            "slope": 0.39806121272308453,
+            "cap": 9.013146900000002,
+            "n_players": 5,
+            "local_weight": 0.19949750780385284
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.17895952403987833,
+            "slope": 0.5035228575256374,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.36389807926192935
+          },
+          "assists_p90": {
+            "intercept": 0.07152960973030545,
+            "slope": 0.22958022356496496,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.36389807926192935
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.06814025403612119,
+            "slope": 0.38423245727646266,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.36389807926192935
+          }
+        }
+      },
+      "observed_attack_retention": 0.7038071078401462,
+      "observed_source_ga_p90": 0.36018291201390606,
+      "observed_target_ga_p90": 0.2534992935979491,
+      "observed_attack_retention_p10": 0.5550276244423276,
+      "observed_attack_retention_p90": 0.9302618357086059
+    },
+    "171": {
+      "name": "Cyprus League by Stoiximan",
+      "n_players": 4,
+      "positions": {},
+      "observed_attack_retention": 0.7926493976707173,
+      "observed_source_ga_p90": 0.181040473572604,
+      "observed_target_ga_p90": 0.14350162233134597
+    },
+    "172": {
+      "name": "Czech First League",
+      "n_players": 13,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03499376056191471,
+            "slope": 0.17255054223093505,
+            "cap": 0.3179928014835843,
+            "n_players": 4,
+            "local_weight": 0.08597704723181428
+          },
+          "assists_p90": {
+            "intercept": 0.017857531910167763,
+            "slope": 0.3346028329173142,
+            "cap": 0.3763254921259843,
+            "n_players": 4,
+            "local_weight": 0.4293916154419383
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 4,
+            "local_weight": 0.4293916154419383
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19486749485151514,
+            "slope": 0.010225376892411337,
+            "cap": 0.5986744615384634,
+            "n_players": 4,
+            "local_weight": 0.0456495937186159
+          },
+          "minutes_per_app": {
+            "intercept": 46.798015785131426,
+            "slope": 0.3826527629976363,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.16060387055328032
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.0681730933977111,
+            "slope": 0.450691555181452,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.11800758357124272
+          },
+          "assists_p90": {
+            "intercept": 0.08997919408875847,
+            "slope": 0.23843720561684525,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.016449464286455665
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.17603579554071055,
+            "slope": 0.2789828957967696,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.21110336871650195
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.05251348532711908,
+            "slope": 0.4157630814723521,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.375
+          },
+          "minutes_per_app": {
+            "intercept": 43.22049187180858,
+            "slope": 0.30956778727074385,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.03614457831325301
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.2353724947635788,
+            "slope": 0.25,
+            "cap": 1.2248013266483273,
+            "n_players": 5,
+            "local_weight": 0.4926229583139976
+          },
+          "assists_p90": {
+            "intercept": 0.09767256726481474,
+            "slope": 0.0,
+            "cap": 0.7988342479457287,
+            "n_players": 5,
+            "local_weight": 0.4926229583139976
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.1535247299259352,
+            "slope": 0.10987670634063748,
+            "cap": 0.7984903361344544,
+            "n_players": 5,
+            "local_weight": 0.4926229583139976
+          }
+        }
+      },
+      "observed_attack_retention": 0.6526525999786141,
+      "observed_source_ga_p90": 0.43387625210922703,
+      "observed_target_ga_p90": 0.28317046400806367,
+      "observed_attack_retention_p10": 0.44462857856711907,
+      "observed_attack_retention_p90": 0.9217457340862871
+    },
+    "182": {
+      "name": "Ligue 2",
+      "n_players": 23,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.031116532254676692,
+            "slope": 0.1998012223903681,
+            "cap": 0.3179928014835843,
+            "n_players": 6,
+            "local_weight": 0.12706757347838404
+          },
+          "assists_p90": {
+            "intercept": 0.004874233598089195,
+            "slope": 0.7164804393594904,
+            "cap": 0.3763254921259843,
+            "n_players": 6,
+            "local_weight": 0.5380021731495749
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.07182922305030674,
+            "slope": 0.41345536597554255,
+            "cap": 0.857538119266055,
+            "n_players": 6,
+            "local_weight": 0.12706757347838404
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 6,
+            "local_weight": 0.5380021731495749
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19678557185419956,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 6,
+            "local_weight": 0.06930402598371084
+          },
+          "minutes_per_app": {
+            "intercept": 45.281535016793214,
+            "slope": 0.4057648576190316,
+            "cap": 90.0,
+            "n_players": 6,
+            "local_weight": 0.22950023349800341
+          },
+          "rating": {
+            "intercept": 5.752167922031926,
+            "slope": 0.1555097518632288,
+            "cap": 8.6815152,
+            "n_players": 6,
+            "local_weight": 0.5436781481484911
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.03545760174183362,
+            "slope": 0.5745248795361165,
+            "cap": 0.7461468835767554,
+            "n_players": 14,
+            "local_weight": 0.3989418378050319
+          },
+          "assists_p90": {
+            "intercept": 0.08782449761692775,
+            "slope": 0.2295577197686918,
+            "cap": 0.688246597338624,
+            "n_players": 14,
+            "local_weight": 0.07661045649680821
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.06365654100487356,
+            "slope": 0.7693124113505044,
+            "cap": 1.9375285437376446,
+            "n_players": 14,
+            "local_weight": 0.3989418378050319
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.10056552527349971,
+            "slope": 0.6170688992410269,
+            "cap": 0.8837269374034704,
+            "n_players": 14,
+            "local_weight": 0.5703479973563157
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.08102311840212019,
+            "slope": 0.25,
+            "cap": 0.46361030769230743,
+            "n_players": 14,
+            "local_weight": 0.7319411277940447
+          },
+          "minutes_per_app": {
+            "intercept": 44.45800476210279,
+            "slope": 0.2918272761909583,
+            "cap": 90.0,
+            "n_players": 14,
+            "local_weight": 0.145779361056877
+          },
+          "rating": {
+            "intercept": 3.5793535079365517,
+            "slope": 0.4727213648115506,
+            "cap": 9.013146900000002,
+            "n_players": 14,
+            "local_weight": 0.4056926140447113
+          }
+        }
+      },
+      "observed_attack_retention": 1.1487084958186706,
+      "observed_source_ga_p90": 0.14915771556060442,
+      "observed_target_ga_p90": 0.17133873508137104,
+      "observed_attack_retention_p10": 0.8832631035326644,
+      "observed_attack_retention_p90": 1.4598500748231784
+    },
+    "183": {
+      "name": "Ligue 3",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.1682910981156593,
+      "observed_source_ga_p90": 0.3003337041156841,
+      "observed_target_ga_p90": 0.3508771929824561
+    },
+    "185": {
+      "name": "Stoiximan Super League",
+      "n_players": 30,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.0351868983518291,
+            "slope": 0.18040837148317104,
+            "cap": 0.3179928014835843,
+            "n_players": 13,
+            "local_weight": 0.23579134626683435
+          },
+          "assists_p90": {
+            "intercept": 0.021356895283246184,
+            "slope": 0.34662305716678976,
+            "cap": 0.3763254921259843,
+            "n_players": 13,
+            "local_weight": 0.7116780656603167
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.06931082006695422,
+            "slope": 0.4185402796114018,
+            "cap": 0.857538119266055,
+            "n_players": 6,
+            "local_weight": 0.12302958743497384
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 13,
+            "local_weight": 0.7116780656603167
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.20525646110343904,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 13,
+            "local_weight": 0.13510230210269988
+          },
+          "minutes_per_app": {
+            "intercept": 50.47512100649667,
+            "slope": 0.3557340024504231,
+            "cap": 90.0,
+            "n_players": 13,
+            "local_weight": 0.3845488882072854
+          },
+          "rating": {
+            "intercept": 6.831420455576186,
+            "slope": 0.0,
+            "cap": 8.6815152,
+            "n_players": 6,
+            "local_weight": 0.5307711996969753
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.042285475831399376,
+            "slope": 0.601993291925585,
+            "cap": 0.7461468835767554,
+            "n_players": 8,
+            "local_weight": 0.2706363076407408
+          },
+          "assists_p90": {
+            "intercept": 0.08826268517565701,
+            "slope": 0.23299306333761635,
+            "cap": 0.688246597338624,
+            "n_players": 8,
+            "local_weight": 0.04432630831774463
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12517364146366888,
+            "slope": 0.4558200584455663,
+            "cap": 0.8837269374034704,
+            "n_players": 8,
+            "local_weight": 0.4259854783203006
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.059744404874224825,
+            "slope": 0.2972155343988938,
+            "cap": 0.46361030769230743,
+            "n_players": 8,
+            "local_weight": 0.6146118006528505
+          },
+          "minutes_per_app": {
+            "intercept": 39.913556965021534,
+            "slope": 0.36114492999915554,
+            "cap": 90.0,
+            "n_players": 8,
+            "local_weight": 0.0906397057614486
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.10260279275244721,
+            "slope": 0.5862086658296235,
+            "cap": 1.2248013266483273,
+            "n_players": 7,
+            "local_weight": 0.5727989445160452
+          },
+          "assists_p90": {
+            "intercept": 0.11125218288877212,
+            "slope": 0.15637224818513717,
+            "cap": 0.7988342479457287,
+            "n_players": 7,
+            "local_weight": 0.5727989445160452
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.3751110519692298,
+            "slope": 0.5635336750324113,
+            "cap": 2.641040373971578,
+            "n_players": 4,
+            "local_weight": 0.28348748001351803
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12079112277673332,
+            "slope": 0.25696749577636874,
+            "cap": 0.7984903361344544,
+            "n_players": 7,
+            "local_weight": 0.5727989445160452
+          },
+          "rating": {
+            "intercept": 3.745451680211853,
+            "slope": 0.44935948651698926,
+            "cap": 9.086178,
+            "n_players": 4,
+            "local_weight": 0.44145617105169793
+          }
+        }
+      },
+      "observed_attack_retention": 1.022542935996343,
+      "observed_source_ga_p90": 0.17855329432401265,
+      "observed_target_ga_p90": 0.18257840980989504,
+      "observed_attack_retention_p10": 0.8434828000313976,
+      "observed_attack_retention_p90": 1.2532681759804485
+    },
+    "186": {
+      "name": "Super League 2",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 0.4902912621359224,
+      "observed_source_ga_p90": 0.297029702970297,
+      "observed_target_ga_p90": 0.14563106796116507
+    },
+    "187": {
+      "name": "OTP Bank Liga",
+      "n_players": 9,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04861386601397412,
+            "slope": 0.5417081281283932,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.1275895297199056
+          },
+          "assists_p90": {
+            "intercept": 0.08907035422827758,
+            "slope": 0.22791843183950652,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.01795297657328936
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.15217444286986026,
+            "slope": 0.37411209789352057,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.22630492099655974
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.048245820245874434,
+            "slope": 0.4094135489344257,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.37499524581060834
+          },
+          "minutes_per_app": {
+            "intercept": 43.19834336761133,
+            "slope": 0.3128012581781151,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.0361438716422594
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.16896908485452072,
+            "slope": 0.40932727757069887,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.3670294521006058
+          },
+          "assists_p90": {
+            "intercept": 0.07450906017074056,
+            "slope": 0.24717612826009888,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.3670294521006058
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.09377082289528332,
+            "slope": 0.2924217133291187,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.3670294521006058
+          }
+        }
+      },
+      "observed_attack_retention": 0.9109324139136997,
+      "observed_source_ga_p90": 0.2401957631354,
+      "observed_target_ga_p90": 0.21880210632477318,
+      "observed_attack_retention_p10": 0.6963911931235109,
+      "observed_attack_retention_p90": 1.2569884422374114
+    },
+    "196": {
+      "name": "J1 League",
+      "n_players": 3,
+      "positions": {},
+      "observed_attack_retention": 1.8021738450144469,
+      "observed_source_ga_p90": 0.32021577747530333,
+      "observed_target_ga_p90": 0.5770844989269579
+    },
+    "202": {
+      "name": "Ekstraklasa",
+      "n_players": 28,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.035027832197446186,
+            "slope": 0.16381198504454336,
+            "cap": 0.3179928014835843,
+            "n_players": 6,
+            "local_weight": 0.12289987936107537
+          },
+          "assists_p90": {
+            "intercept": 0.02386731671488204,
+            "slope": 0.35781935198603754,
+            "cap": 0.3763254921259843,
+            "n_players": 6,
+            "local_weight": 0.528516626999057
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 6,
+            "local_weight": 0.528516626999057
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19982966077446024,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 6,
+            "local_weight": 0.06677914873151602
+          },
+          "minutes_per_app": {
+            "intercept": 44.8074965144248,
+            "slope": 0.4133246604799087,
+            "cap": 90.0,
+            "n_players": 6,
+            "local_weight": 0.22253458456445627
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04519840842261165,
+            "slope": 0.49374162958252754,
+            "cap": 0.7461468835767554,
+            "n_players": 15,
+            "local_weight": 0.4159319362195259
+          },
+          "assists_p90": {
+            "intercept": 0.0887151550325282,
+            "slope": 0.23526675342014008,
+            "cap": 0.688246597338624,
+            "n_players": 15,
+            "local_weight": 0.08173997474403447
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.10983371681531033,
+            "slope": 0.7337247446100393,
+            "cap": 1.9375285437376446,
+            "n_players": 5,
+            "local_weight": 0.1996156066989123
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.11956867939812556,
+            "slope": 0.5891718918345119,
+            "cap": 0.8837269374034704,
+            "n_players": 15,
+            "local_weight": 0.5875027260562331
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.056464029009039345,
+            "slope": 0.3938745930378641,
+            "cap": 0.46361030769230743,
+            "n_players": 15,
+            "local_weight": 0.7493006245079876
+          },
+          "minutes_per_app": {
+            "intercept": 46.90067921198457,
+            "slope": 0.25,
+            "cap": 90.0,
+            "n_players": 15,
+            "local_weight": 0.15739987374648953
+          },
+          "rating": {
+            "intercept": 3.7618860796832205,
+            "slope": 0.44982245920357067,
+            "cap": 9.013146900000002,
+            "n_players": 5,
+            "local_weight": 0.19986414950689962
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.1457268318433119,
+            "slope": 0.5077820308096941,
+            "cap": 1.2248013266483273,
+            "n_players": 4,
+            "local_weight": 0.4307763255158815
+          },
+          "assists_p90": {
+            "intercept": 0.07315033393224336,
+            "slope": 0.5282993348654217,
+            "cap": 0.7988342479457287,
+            "n_players": 4,
+            "local_weight": 0.4307763255158815
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.4889401995358845,
+            "slope": 0.48661411190963055,
+            "cap": 2.641040373971578,
+            "n_players": 3,
+            "local_weight": 0.22001436391120513
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12739370835366465,
+            "slope": 0.39834394979191845,
+            "cap": 0.7984903361344544,
+            "n_players": 4,
+            "local_weight": 0.4307763255158815
+          },
+          "rating": {
+            "intercept": 3.766489704500083,
+            "slope": 0.44517513463308594,
+            "cap": 9.086178,
+            "n_players": 3,
+            "local_weight": 0.367816091954023
+          }
+        },
+        "GK": {
+          "red_cards_p90": {
+            "intercept": 0.0094938722991645,
+            "slope": 0.0,
+            "cap": 0.05801540888176059,
+            "n_players": 3,
+            "local_weight": 0.3749822599268576
+          },
+          "saves_p90": {
+            "intercept": 1.517321594061574,
+            "slope": 0.5,
+            "cap": 5.022311538461539,
+            "n_players": 3,
+            "local_weight": 0.3749822599268576
+          },
+          "minutes_per_app": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.375
+          }
+        }
+      },
+      "observed_attack_retention": 0.7765993386529325,
+      "observed_source_ga_p90": 0.28749517843360783,
+      "observed_target_ga_p90": 0.22326856543744666,
+      "observed_attack_retention_p10": 0.6508467067704493,
+      "observed_attack_retention_p90": 0.9089290649063053
+    },
+    "203": {
+      "name": "Russian Premier League",
+      "n_players": 19,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.04088148444087503,
+            "slope": 0.07080135202744035,
+            "cap": 0.3179928014835843,
+            "n_players": 7,
+            "local_weight": 0.14219220194156088
+          },
+          "assists_p90": {
+            "intercept": 0.01157764116222701,
+            "slope": 0.2717989487528946,
+            "cap": 0.3763254921259843,
+            "n_players": 7,
+            "local_weight": 0.5700955873526259
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09060335959669917,
+            "slope": 0.3531941860735108,
+            "cap": 0.857538119266055,
+            "n_players": 7,
+            "local_weight": 0.14219220194156088
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 7,
+            "local_weight": 0.5700955873526259
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19192217114584573,
+            "slope": 0.01564881605108888,
+            "cap": 0.5986744615384634,
+            "n_players": 7,
+            "local_weight": 0.07746277569181559
+          },
+          "minutes_per_app": {
+            "intercept": 50.81678432443082,
+            "slope": 0.33318057364192566,
+            "cap": 90.0,
+            "n_players": 7,
+            "local_weight": 0.25142326972745926
+          },
+          "rating": {
+            "intercept": 6.7735088719569125,
+            "slope": 0.0,
+            "cap": 8.6815152,
+            "n_players": 7,
+            "local_weight": 0.5732830113393823
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.045246702583761955,
+            "slope": 0.5417533417189462,
+            "cap": 0.7461468835767554,
+            "n_players": 9,
+            "local_weight": 0.28156319368213023
+          },
+          "assists_p90": {
+            "intercept": 0.08400162758091659,
+            "slope": 0.26049454067477346,
+            "cap": 0.688246597338624,
+            "n_players": 9,
+            "local_weight": 0.046701028634520435
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.07514642796773541,
+            "slope": 0.8488772620961424,
+            "cap": 1.9375285437376446,
+            "n_players": 9,
+            "local_weight": 0.28156319368213023
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.18096023993673022,
+            "slope": 0.29656553771871613,
+            "cap": 0.8837269374034704,
+            "n_players": 9,
+            "local_weight": 0.439405867881014
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.030108060088227268,
+            "slope": 0.4950974984662192,
+            "cap": 0.46361030769230743,
+            "n_players": 9,
+            "local_weight": 0.6256755280441602
+          },
+          "minutes_per_app": {
+            "intercept": 43.782519079199815,
+            "slope": 0.298996437144445,
+            "cap": 90.0,
+            "n_players": 9,
+            "local_weight": 0.09458625858084728
+          },
+          "rating": {
+            "intercept": 3.3671128280785543,
+            "slope": 0.5061347109902697,
+            "cap": 9.013146900000002,
+            "n_players": 9,
+            "local_weight": 0.2947166099055874
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.13767764498343846,
+            "slope": 0.5578401642713715,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.3694973553579244
+          },
+          "assists_p90": {
+            "intercept": 0.06816630308119315,
+            "slope": 0.17878595235400935,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.3694973553579244
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.4612102036955644,
+            "slope": 0.5064616945792059,
+            "cap": 2.641040373971578,
+            "n_players": 3,
+            "local_weight": 0.22661561241382447
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.049682331148608455,
+            "slope": 0.42216223565828065,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.3694973553579244
+          },
+          "rating": {
+            "intercept": 3.8922358415622593,
+            "slope": 0.42652770521712896,
+            "cap": 9.086178,
+            "n_players": 3,
+            "local_weight": 0.375
+          }
+        }
+      },
+      "observed_attack_retention": 0.7458871194223501,
+      "observed_source_ga_p90": 0.2181549366590326,
+      "observed_target_ga_p90": 0.16271895729237107,
+      "observed_attack_retention_p10": 0.511291783404098,
+      "observed_attack_retention_p90": 0.9859452593773933
+    },
+    "204": {
+      "name": "First League",
+      "n_players": 3,
+      "positions": {},
+      "observed_attack_retention": 1.5372026373184893,
+      "observed_source_ga_p90": 0.1788455249719988,
+      "observed_target_ga_p90": 0.2749218126595663
+    },
+    "210": {
+      "name": "Mozzart Bet Superliga",
+      "n_players": 7,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05245914966687641,
+            "slope": 0.515686216072543,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.12943350526885608
+          },
+          "assists_p90": {
+            "intercept": 0.08677081857441687,
+            "slope": 0.23777931677618852,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.018245578716415998
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.1286637087393199,
+            "slope": 0.5272297178378179,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.2292007535902613
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.07237682627527375,
+            "slope": 0.2737933942482765,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.375
+          },
+          "minutes_per_app": {
+            "intercept": 43.39778672799962,
+            "slope": 0.3112243577492255,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.03614457831325301
+          }
+        }
+      },
+      "observed_attack_retention": 0.7058883453317671,
+      "observed_source_ga_p90": 0.22519678722703895,
+      "observed_target_ga_p90": 0.15896378750972456,
+      "observed_attack_retention_p10": 0.4879821723637853,
+      "observed_attack_retention_p90": 1.0067941616723215
+    },
+    "211": {
+      "name": "Niké Liga",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 0.5027088897367417,
+      "observed_source_ga_p90": 0.40983606557377056,
+      "observed_target_ga_p90": 0.20602823349866464
+    },
+    "212": {
+      "name": "PrvaLiga",
+      "n_players": 6,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.053262202648968915,
+            "slope": 0.4164801658454309,
+            "cap": 0.7461468835767554,
+            "n_players": 4,
+            "local_weight": 0.14976370230766908
+          },
+          "assists_p90": {
+            "intercept": 0.08628195401195943,
+            "slope": 0.24963936564828274,
+            "cap": 0.688246597338624,
+            "n_players": 4,
+            "local_weight": 0.021543606816639176
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14232380018180174,
+            "slope": 0.49312908283843937,
+            "cap": 0.8837269374034704,
+            "n_players": 4,
+            "local_weight": 0.26051214176805404
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.0451470522928364,
+            "slope": 0.42902495837292526,
+            "cap": 0.46361030769230743,
+            "n_players": 4,
+            "local_weight": 0.4418043017007627
+          },
+          "minutes_per_app": {
+            "intercept": 42.11130705497311,
+            "slope": 0.3259636783169345,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.047136172323310487
+          }
+        }
+      },
+      "observed_attack_retention": 0.6167926881421459,
+      "observed_source_ga_p90": 0.3662495716400021,
+      "observed_target_ga_p90": 0.22590005782274636,
+      "observed_attack_retention_p10": 0.36288599303488867,
+      "observed_attack_retention_p90": 0.9266097929925091
+    },
+    "215": {
+      "name": "Swiss Super League",
+      "n_players": 18,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.027999163730666375,
+            "slope": 0.22845178761759405,
+            "cap": 0.3179928014835843,
+            "n_players": 7,
+            "local_weight": 0.14122979774928884
+          },
+          "assists_p90": {
+            "intercept": 0.014071233047054267,
+            "slope": 0.47604902727308557,
+            "cap": 0.3763254921259843,
+            "n_players": 7,
+            "local_weight": 0.5681552372576404
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08596691946615882,
+            "slope": 0.3753665745163466,
+            "cap": 0.857538119266055,
+            "n_players": 7,
+            "local_weight": 0.14122979774928884
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 7,
+            "local_weight": 0.5681552372576404
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.18515534483851984,
+            "slope": 0.035705893984309144,
+            "cap": 0.5986744615384634,
+            "n_players": 7,
+            "local_weight": 0.07801223696611624
+          },
+          "minutes_per_app": {
+            "intercept": 27.904555288194665,
+            "slope": 0.6059502051488461,
+            "cap": 90.0,
+            "n_players": 7,
+            "local_weight": 0.25286844800370717
+          },
+          "rating": {
+            "intercept": 6.784413046902412,
+            "slope": 0.0,
+            "cap": 8.6815152,
+            "n_players": 7,
+            "local_weight": 0.5751567828787583
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.045652170946153134,
+            "slope": 0.5943709957387904,
+            "cap": 0.7461468835767554,
+            "n_players": 4,
+            "local_weight": 0.15923498127270416
+          },
+          "assists_p90": {
+            "intercept": 0.08804981081739124,
+            "slope": 0.23316753478474772,
+            "cap": 0.688246597338624,
+            "n_players": 4,
+            "local_weight": 0.02312661848822769
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09769688797561088,
+            "slope": 0.744384634877075,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.12277485577786297
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.1407246394804313,
+            "slope": 0.4014331919014259,
+            "cap": 0.8837269374034704,
+            "n_players": 4,
+            "local_weight": 0.27472425150228436
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.04301791780923815,
+            "slope": 0.35123853317678283,
+            "cap": 0.46361030769230743,
+            "n_players": 4,
+            "local_weight": 0.44246437866515076
+          },
+          "minutes_per_app": {
+            "intercept": 44.534407835726,
+            "slope": 0.29011556984603515,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.04725651573432192
+          },
+          "rating": {
+            "intercept": 3.4804808045051554,
+            "slope": 0.4868981119453455,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.12932312219546965
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.17941470826647404,
+            "slope": 0.3294306858451024,
+            "cap": 1.2248013266483273,
+            "n_players": 7,
+            "local_weight": 0.5634656406964134
+          },
+          "assists_p90": {
+            "intercept": 0.03222118467245967,
+            "slope": 0.1696521076627405,
+            "cap": 0.7988342479457287,
+            "n_players": 7,
+            "local_weight": 0.5634656406964134
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.48859896304887185,
+            "slope": 0.43712772826962776,
+            "cap": 2.641040373971578,
+            "n_players": 6,
+            "local_weight": 0.3562417966245894
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.07689525513127751,
+            "slope": 0.7022184622637234,
+            "cap": 0.7984903361344544,
+            "n_players": 7,
+            "local_weight": 0.5634656406964134
+          },
+          "rating": {
+            "intercept": 4.187148771485152,
+            "slope": 0.380400075702778,
+            "cap": 9.086178,
+            "n_players": 6,
+            "local_weight": 0.5445700199276573
+          }
+        }
+      },
+      "observed_attack_retention": 0.6153218526277577,
+      "observed_source_ga_p90": 0.2725219147840725,
+      "observed_target_ga_p90": 0.1676886894865994,
+      "observed_attack_retention_p10": 0.4362632400347849,
+      "observed_attack_retention_p90": 0.8210780742733199
+    },
+    "218": {
+      "name": "Ukrainian Premier League",
+      "n_players": 7,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03548506067101018,
+            "slope": 0.10856274810686023,
+            "cap": 0.3179928014835843,
+            "n_players": 4,
+            "local_weight": 0.08171295367572394
+          },
+          "assists_p90": {
+            "intercept": 0.019824667807610732,
+            "slope": 0.47883009200502613,
+            "cap": 0.3763254921259843,
+            "n_players": 4,
+            "local_weight": 0.4158444700075571
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 4,
+            "local_weight": 0.4158444700075571
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19899140662909037,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 4,
+            "local_weight": 0.04593257510863261
+          },
+          "minutes_per_app": {
+            "intercept": 41.80515396127815,
+            "slope": 0.44094366343971547,
+            "cap": 90.0,
+            "n_players": 4,
+            "local_weight": 0.16147887831460098
+          }
+        }
+      },
+      "observed_attack_retention": 1.1104378030511162,
+      "observed_source_ga_p90": 0.25329670836148677,
+      "observed_target_ga_p90": 0.2812702403530086,
+      "observed_attack_retention_p10": 0.688851372834981,
+      "observed_attack_retention_p90": 1.538915284448709
+    },
+    "222": {
+      "name": "WWIN Liga BiH",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 0.710771840542833,
+      "observed_source_ga_p90": 0.6443914081145584,
+      "observed_target_ga_p90": 0.45801526717557256
+    },
+    "229": {
+      "name": "Betclic 1. Liga",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.0,
+      "observed_source_ga_p90": 0.0,
+      "observed_target_ga_p90": 0.13392857142857142
+    },
+    "238": {
+      "name": "Liga Portugal Betclic",
+      "n_players": 60,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03295680521924561,
+            "slope": 0.1590783893805358,
+            "cap": 0.3179928014835843,
+            "n_players": 28,
+            "local_weight": 0.40261126816340337
+          },
+          "assists_p90": {
+            "intercept": 0.014243917569777635,
+            "slope": 0.6925959762412215,
+            "cap": 0.3763254921259843,
+            "n_players": 28,
+            "local_weight": 0.8435450235412193
+          },
+          "xa_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.3410721152305101,
+            "n_players": 6,
+            "local_weight": 0.5339404826313086
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08577606102506771,
+            "slope": 0.34969355722394124,
+            "cap": 0.857538119266055,
+            "n_players": 28,
+            "local_weight": 0.40261126816340337
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 28,
+            "local_weight": 0.8435450235412193
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.20308775800748002,
+            "slope": 0.0,
+            "cap": 0.5986744615384634,
+            "n_players": 28,
+            "local_weight": 0.2548329010354181
+          },
+          "minutes_per_app": {
+            "intercept": 57.8666581371109,
+            "slope": 0.2725332719965379,
+            "cap": 90.0,
+            "n_players": 28,
+            "local_weight": 0.5776890639518314
+          },
+          "rating": {
+            "intercept": 4.566524542828917,
+            "slope": 0.3325234685918508,
+            "cap": 8.6815152,
+            "n_players": 28,
+            "local_weight": 0.845480953667495
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.03194199175361134,
+            "slope": 0.633072221697215,
+            "cap": 0.7461468835767554,
+            "n_players": 24,
+            "local_weight": 0.5318756641672258
+          },
+          "assists_p90": {
+            "intercept": 0.08988532525300391,
+            "slope": 0.2357823732455768,
+            "cap": 0.688246597338624,
+            "n_players": 24,
+            "local_weight": 0.12436095100803754
+          },
+          "xg_p90": {
+            "intercept": 0.06267506154727631,
+            "slope": 0.5606360407032682,
+            "cap": 0.48207985293272815,
+            "n_players": 5,
+            "local_weight": 0.3324314709593226
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.09247989686464217,
+            "slope": 0.7475013318582521,
+            "cap": 1.9375285437376446,
+            "n_players": 24,
+            "local_weight": 0.5318756641672258
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.10776969718190424,
+            "slope": 0.46804113268426006,
+            "cap": 0.8837269374034704,
+            "n_players": 24,
+            "local_weight": 0.6944110107739973
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.041640199687379253,
+            "slope": 0.38586909894352095,
+            "cap": 0.46361030769230743,
+            "n_players": 24,
+            "local_weight": 0.8263444097964047
+          },
+          "minutes_per_app": {
+            "intercept": 43.76221125472626,
+            "slope": 0.296420886770315,
+            "cap": 90.0,
+            "n_players": 24,
+            "local_weight": 0.22923231513051434
+          },
+          "rating": {
+            "intercept": 2.7416788650751034,
+            "slope": 0.5924871215664675,
+            "cap": 9.013146900000002,
+            "n_players": 24,
+            "local_weight": 0.543302079811095
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.11062174927277424,
+            "slope": 0.5975086594201494,
+            "cap": 1.2248013266483273,
+            "n_players": 7,
+            "local_weight": 0.564998462345577
+          },
+          "assists_p90": {
+            "intercept": 0.11230232326473057,
+            "slope": 0.0,
+            "cap": 0.7988342479457287,
+            "n_players": 7,
+            "local_weight": 0.564998462345577
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.4994060399275119,
+            "slope": 0.46279196858648874,
+            "cap": 2.641040373971578,
+            "n_players": 7,
+            "local_weight": 0.39372672956789545
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13893645442282024,
+            "slope": 0.3635746916468758,
+            "cap": 0.7984903361344544,
+            "n_players": 7,
+            "local_weight": 0.564998462345577
+          },
+          "rating": {
+            "intercept": 3.774781859042128,
+            "slope": 0.4492983972235086,
+            "cap": 9.086178,
+            "n_players": 7,
+            "local_weight": 0.5823420901608877
+          }
+        }
+      },
+      "observed_attack_retention": 0.8254351957323127,
+      "observed_source_ga_p90": 0.23154994132558437,
+      "observed_target_ga_p90": 0.19112947113988926,
+      "observed_attack_retention_p10": 0.720493158540267,
+      "observed_attack_retention_p90": 0.9370137391515395
+    },
+    "239": {
+      "name": "Liga Portugal 2",
+      "n_players": 6,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04360085608454705,
+            "slope": 0.527880280883751,
+            "cap": 0.7461468835767554,
+            "n_players": 5,
+            "local_weight": 0.1935960765294752
+          },
+          "assists_p90": {
+            "intercept": 0.08776370375332002,
+            "slope": 0.2323922369980695,
+            "cap": 0.688246597338624,
+            "n_players": 5,
+            "local_weight": 0.02913485377457485
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13045937488000586,
+            "slope": 0.44939853413618847,
+            "cap": 0.8837269374034704,
+            "n_players": 5,
+            "local_weight": 0.3243912749652783
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.07028419316400844,
+            "slope": 0.30349958535098587,
+            "cap": 0.46361030769230743,
+            "n_players": 5,
+            "local_weight": 0.49643264900746575
+          },
+          "minutes_per_app": {
+            "intercept": 44.511605549229685,
+            "slope": 0.2962227167885243,
+            "cap": 90.0,
+            "n_players": 5,
+            "local_weight": 0.058038470012167026
+          }
+        }
+      },
+      "observed_attack_retention": 1.2895457116910654,
+      "observed_source_ga_p90": 0.16956687871873996,
+      "observed_target_ga_p90": 0.2186642412965901,
+      "observed_attack_retention_p10": 0.702899788165755,
+      "observed_attack_retention_p90": 3.324624888914107
+    },
+    "242": {
+      "name": "MLS",
+      "n_players": 9,
+      "positions": {
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.23695503494762132,
+            "slope": 0.27438315893382237,
+            "cap": 1.2248013266483273,
+            "n_players": 6,
+            "local_weight": 0.540613044908789
+          },
+          "assists_p90": {
+            "intercept": 0.04196377843844752,
+            "slope": 0.6061644902135411,
+            "cap": 0.7988342479457287,
+            "n_players": 6,
+            "local_weight": 0.540613044908789
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.6485638174700246,
+            "slope": 0.2965502028552191,
+            "cap": 2.641040373971578,
+            "n_players": 6,
+            "local_weight": 0.3704384522712148
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.07965045999715528,
+            "slope": 0.41397140471763283,
+            "cap": 0.7984903361344544,
+            "n_players": 6,
+            "local_weight": 0.540613044908789
+          },
+          "rating": {
+            "intercept": 3.437192535356359,
+            "slope": 0.4949895454366242,
+            "cap": 9.086178,
+            "n_players": 6,
+            "local_weight": 0.5429942230714113
+          }
+        }
+      },
+      "observed_attack_retention": 0.6518698796964467,
+      "observed_source_ga_p90": 0.551214882196998,
+      "observed_target_ga_p90": 0.35932037894464813,
+      "observed_attack_retention_p10": 0.5198481334155414,
+      "observed_attack_retention_p90": 0.813267768311426
+    },
+    "247": {
+      "name": "Parva Liga",
+      "n_players": 7,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.05880209752269472,
+            "slope": 0.4921331734173454,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.11700995692892828
+          },
+          "assists_p90": {
+            "intercept": 0.08761668281354666,
+            "slope": 0.2342214267739068,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.016294540124491552
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.12459793799470559,
+            "slope": 0.4017659409980041,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.20950566501776177
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.051263483381170136,
+            "slope": 0.3975892146842956,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.3620453855597807
+          },
+          "minutes_per_app": {
+            "intercept": 42.807763355908335,
+            "slope": 0.32252845450734446,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.034254371368691895
+          }
+        }
+      },
+      "observed_attack_retention": 0.7006448739070114,
+      "observed_source_ga_p90": 0.3192994861744612,
+      "observed_target_ga_p90": 0.22371554822927886,
+      "observed_attack_retention_p10": 0.4780786029740954,
+      "observed_attack_retention_p90": 1.1319549167683967
+    },
+    "266": {
+      "name": "Israeli Premier League",
+      "n_players": 3,
+      "positions": {},
+      "observed_attack_retention": 1.6675758159324958,
+      "observed_source_ga_p90": 0.3455335168237673,
+      "observed_target_ga_p90": 0.5762033362494186
+    },
+    "325": {
+      "name": "Brasileirão Betano",
+      "n_players": 21,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03591261329407415,
+            "slope": 0.2615610998572237,
+            "cap": 0.3179928014835843,
+            "n_players": 5,
+            "local_weight": 0.1039749832329154
+          },
+          "assists_p90": {
+            "intercept": 0.0223818770506847,
+            "slope": 0.3431503217740025,
+            "cap": 0.3763254921259843,
+            "n_players": 5,
+            "local_weight": 0.481414450171019
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08036201276876778,
+            "slope": 0.4298490189995064,
+            "cap": 0.857538119266055,
+            "n_players": 5,
+            "local_weight": 0.1039749832329154
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 5,
+            "local_weight": 0.481414450171019
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.1984875001155729,
+            "slope": 0.02866382062268676,
+            "cap": 0.5986744615384634,
+            "n_players": 5,
+            "local_weight": 0.05615179788883839
+          },
+          "minutes_per_app": {
+            "intercept": 41.5908733995347,
+            "slope": 0.4589038597948127,
+            "cap": 90.0,
+            "n_players": 5,
+            "local_weight": 0.19222573045818636
+          },
+          "rating": {
+            "intercept": 6.6734049066544445,
+            "slope": 0.029407376868141998,
+            "cap": 8.6815152,
+            "n_players": 5,
+            "local_weight": 0.487673016416512
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04979158749438414,
+            "slope": 0.5405610835310495,
+            "cap": 0.7461468835767554,
+            "n_players": 10,
+            "local_weight": 0.32782918509989833
+          },
+          "assists_p90": {
+            "intercept": 0.08677095368285288,
+            "slope": 0.2381405223775338,
+            "cap": 0.688246597338624,
+            "n_players": 10,
+            "local_weight": 0.05746151439691594
+          },
+          "xg_p90": {
+            "intercept": 0.08370629315892539,
+            "slope": 0.36269782212572504,
+            "cap": 0.48207985293272815,
+            "n_players": 4,
+            "local_weight": 0.28053900648873586
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.14839286036423954,
+            "slope": 0.6434558027948066,
+            "cap": 1.9375285437376446,
+            "n_players": 10,
+            "local_weight": 0.32782918509989833
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13963084471478535,
+            "slope": 0.33166980833858695,
+            "cap": 0.8837269374034704,
+            "n_players": 10,
+            "local_weight": 0.4937821653245772
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.08073388274039978,
+            "slope": 0.3394106810843315,
+            "cap": 0.46361030769230743,
+            "n_players": 10,
+            "local_weight": 0.6663303897028491
+          },
+          "minutes_per_app": {
+            "intercept": 42.50865600995164,
+            "slope": 0.33093291603599784,
+            "cap": 90.0,
+            "n_players": 10,
+            "local_weight": 0.11096178022409099
+          },
+          "rating": {
+            "intercept": 3.4377337221949302,
+            "slope": 0.4973086243462665,
+            "cap": 9.013146900000002,
+            "n_players": 10,
+            "local_weight": 0.3329972259072929
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.19355256093022466,
+            "slope": 0.40446697469302906,
+            "cap": 1.2248013266483273,
+            "n_players": 5,
+            "local_weight": 0.4819044896985922
+          },
+          "assists_p90": {
+            "intercept": 0.09622769395349438,
+            "slope": 0.20838659103975088,
+            "cap": 0.7988342479457287,
+            "n_players": 5,
+            "local_weight": 0.4819044896985922
+          },
+          "xg_p90": {
+            "intercept": 0.0814243682189355,
+            "slope": 0.8689308328886273,
+            "cap": 1.0778125852367528,
+            "n_players": 3,
+            "local_weight": 0.12671547485472673
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.46710279332167715,
+            "slope": 0.49477125194568555,
+            "cap": 2.641040373971578,
+            "n_players": 5,
+            "local_weight": 0.31744016527847657
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.109257756829194,
+            "slope": 0.31119100620579976,
+            "cap": 0.7984903361344544,
+            "n_players": 5,
+            "local_weight": 0.4819044896985922
+          },
+          "rating": {
+            "intercept": 3.8632765006926144,
+            "slope": 0.4327827215656512,
+            "cap": 9.086178,
+            "n_players": 5,
+            "local_weight": 0.49946142487172374
+          }
+        }
+      },
+      "observed_attack_retention": 1.3977744919129613,
+      "observed_source_ga_p90": 0.15479565367112488,
+      "observed_target_ga_p90": 0.2163694161604913,
+      "observed_attack_retention_p10": 1.0899546582812658,
+      "observed_attack_retention_p90": 1.9385727071806285
+    },
+    "358": {
+      "name": "South African Premier Division",
+      "n_players": 2,
+      "positions": {},
+      "observed_attack_retention": 0.4809192359597217,
+      "observed_source_ga_p90": 0.1979964161271565,
+      "observed_target_ga_p90": 0.09522028516663522
+    },
+    "382": {
+      "name": "Paranaense",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.3724027703782635,
+      "observed_source_ga_p90": 0.06987577639751552,
+      "observed_target_ga_p90": 0.09589770911028238
+    },
+    "390": {
+      "name": "Brasileirão Série B",
+      "n_players": 3,
+      "positions": {},
+      "observed_attack_retention": 0.6061792199822045,
+      "observed_source_ga_p90": 0.2618083961439543,
+      "observed_target_ga_p90": 0.1587028093593342
+    },
+    "491": {
+      "name": "3. Liga",
+      "n_players": 4,
+      "positions": {},
+      "observed_attack_retention": 1.6155150247317565,
+      "observed_source_ga_p90": 0.1776102102512531,
+      "observed_target_ga_p90": 0.2869319632066656,
+      "observed_attack_retention_p10": 0.9885496644050998,
+      "observed_attack_retention_p90": 2.9640177297421793
+    },
+    "493": {
+      "name": "Regionalliga West",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 0.0,
+      "observed_source_ga_p90": 0.17928286852589642,
+      "observed_target_ga_p90": 0.0
+    },
+    "649": {
+      "name": "Chinese Super League",
+      "n_players": 10,
+      "positions": {
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.04616776698099732,
+            "slope": 0.5174954262531071,
+            "cap": 0.7461468835767554,
+            "n_players": 5,
+            "local_weight": 0.19170497700527475
+          },
+          "assists_p90": {
+            "intercept": 0.08852053246055235,
+            "slope": 0.22365987363422105,
+            "cap": 0.688246597338624,
+            "n_players": 5,
+            "local_weight": 0.028792895889523707
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.14549426443735908,
+            "slope": 0.6159406873060047,
+            "cap": 1.9375285437376446,
+            "n_players": 5,
+            "local_weight": 0.19170497700527475
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13677054001493585,
+            "slope": 0.39332746138512564,
+            "cap": 0.8837269374034704,
+            "n_players": 5,
+            "local_weight": 0.3217322755285031
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.09869639412764988,
+            "slope": 0.25,
+            "cap": 0.46361030769230743,
+            "n_players": 5,
+            "local_weight": 0.49648825449793116
+          },
+          "minutes_per_app": {
+            "intercept": 42.80566043073666,
+            "slope": 0.32559238449962347,
+            "cap": 90.0,
+            "n_players": 5,
+            "local_weight": 0.05805063162709419
+          },
+          "rating": {
+            "intercept": 2.603907214779506,
+            "slope": 0.6192537497711488,
+            "cap": 9.013146900000002,
+            "n_players": 5,
+            "local_weight": 0.1977619143831936
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.16906225149314658,
+            "slope": 0.5612390948900159,
+            "cap": 1.2248013266483273,
+            "n_players": 4,
+            "local_weight": 0.431690663845937
+          },
+          "assists_p90": {
+            "intercept": 0.061329199477039506,
+            "slope": 0.2754062122532093,
+            "cap": 0.7988342479457287,
+            "n_players": 4,
+            "local_weight": 0.431690663845937
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.40904843025882287,
+            "slope": 0.6140144542680319,
+            "cap": 2.641040373971578,
+            "n_players": 4,
+            "local_weight": 0.27525862015497804
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14217617687592116,
+            "slope": 0.19650484322726758,
+            "cap": 0.7984903361344544,
+            "n_players": 4,
+            "local_weight": 0.431690663845937
+          },
+          "rating": {
+            "intercept": 3.6290818567821126,
+            "slope": 0.4700296891528414,
+            "cap": 9.086178,
+            "n_players": 4,
+            "local_weight": 0.4417785612210107
+          }
+        }
+      },
+      "observed_attack_retention": 0.7197813370333291,
+      "observed_source_ga_p90": 0.45657097419917086,
+      "observed_target_ga_p90": 0.3286312662596888,
+      "observed_attack_retention_p10": 0.5826389211931341,
+      "observed_attack_retention_p90": 0.8884847012187302
+    },
+    "709": {
+      "name": "Misli Premier League",
+      "n_players": 2,
+      "positions": {},
+      "observed_attack_retention": 0.2805737904206176,
+      "observed_source_ga_p90": 0.7019064124783362,
+      "observed_target_ga_p90": 0.19693654266958427
+    },
+    "720": {
+      "name": "Abissnet Superiore",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 3.5000000000000004,
+      "observed_source_ga_p90": 0.045112781954887216,
+      "observed_target_ga_p90": 0.15789473684210528
+    },
+    "772": {
+      "name": "Uzbekistan Super League",
+      "n_players": 2,
+      "positions": {},
+      "observed_attack_retention": 0.1628435293860512,
+      "observed_source_ga_p90": 0.33173606734095623,
+      "observed_target_ga_p90": 0.05402107203045007
+    },
+    "825": {
+      "name": "Stars League",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.570548712206047,
+      "observed_source_ga_p90": 0.1925133689839572,
+      "observed_target_ga_p90": 0.3023516237402016
+    },
+    "955": {
+      "name": "Saudi Pro League",
+      "n_players": 9,
+      "positions": {
+        "DF": {
+          "goals_p90": {
+            "intercept": 0.03097157757669526,
+            "slope": 0.21816363489447038,
+            "cap": 0.3179928014835843,
+            "n_players": 3,
+            "local_weight": 0.06837165364589266
+          },
+          "assists_p90": {
+            "intercept": 0.024338985970260248,
+            "slope": 0.25,
+            "cap": 0.3763254921259843,
+            "n_players": 3,
+            "local_weight": 0.36992604243257204
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.08333279484325992,
+            "slope": 0.3138002214804198,
+            "cap": 0.857538119266055,
+            "n_players": 3,
+            "local_weight": 0.06837165364589266
+          },
+          "red_cards_p90": {
+            "intercept": 0.0,
+            "slope": 1.0,
+            "cap": 0.20102014881276678,
+            "n_players": 3,
+            "local_weight": 0.36992604243257204
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.19402460099225546,
+            "slope": 0.005201346911999759,
+            "cap": 0.5986744615384634,
+            "n_players": 3,
+            "local_weight": 0.03614457831325301
+          },
+          "minutes_per_app": {
+            "intercept": 51.319837378453315,
+            "slope": 0.3129291000662775,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.13043478260869565
+          },
+          "rating": {
+            "intercept": 6.011480391967774,
+            "slope": 0.11423171061247278,
+            "cap": 8.6815152,
+            "n_players": 3,
+            "local_weight": 0.375
+          }
+        },
+        "MF": {
+          "goals_p90": {
+            "intercept": 0.06826572116988688,
+            "slope": 0.4001423179050893,
+            "cap": 0.7461468835767554,
+            "n_players": 3,
+            "local_weight": 0.12090330633920168
+          },
+          "assists_p90": {
+            "intercept": 0.08795425913971386,
+            "slope": 0.22328504510903183,
+            "cap": 0.688246597338624,
+            "n_players": 3,
+            "local_weight": 0.01690086214114136
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.10707688441910979,
+            "slope": 0.6771629983297935,
+            "cap": 1.9375285437376446,
+            "n_players": 3,
+            "local_weight": 0.12090330633920168
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.13271892253390605,
+            "slope": 0.36059971201979824,
+            "cap": 0.8837269374034704,
+            "n_players": 3,
+            "local_weight": 0.21572477421636685
+          },
+          "clean_sheet_rate": {
+            "intercept": 0.036682966208511705,
+            "slope": 0.4717682320855576,
+            "cap": 0.46361030769230743,
+            "n_players": 3,
+            "local_weight": 0.3595145074699674
+          },
+          "minutes_per_app": {
+            "intercept": 43.021782271601516,
+            "slope": 0.3134582035125366,
+            "cap": 90.0,
+            "n_players": 3,
+            "local_weight": 0.03389317775478134
+          },
+          "rating": {
+            "intercept": 3.4482787509185915,
+            "slope": 0.4931241749788827,
+            "cap": 9.013146900000002,
+            "n_players": 3,
+            "local_weight": 0.12306002510313965
+          }
+        },
+        "FW": {
+          "goals_p90": {
+            "intercept": 0.17469324063087543,
+            "slope": 0.4891032903401962,
+            "cap": 1.2248013266483273,
+            "n_players": 3,
+            "local_weight": 0.3498717263320179
+          },
+          "assists_p90": {
+            "intercept": 0.10149756799718522,
+            "slope": 0.20989205446157486,
+            "cap": 0.7988342479457287,
+            "n_players": 3,
+            "local_weight": 0.3498717263320179
+          },
+          "shots_on_target_p90": {
+            "intercept": 0.5909586185476559,
+            "slope": 0.42840215444582697,
+            "cap": 2.641040373971578,
+            "n_players": 3,
+            "local_weight": 0.21202698718343074
+          },
+          "yellow_cards_p90": {
+            "intercept": 0.14504963511159652,
+            "slope": 0.27824624552243604,
+            "cap": 0.7984903361344544,
+            "n_players": 3,
+            "local_weight": 0.3498717263320179
+          },
+          "rating": {
+            "intercept": 2.902697769175589,
+            "slope": 0.5801383358190607,
+            "cap": 9.086178,
+            "n_players": 3,
+            "local_weight": 0.3620008319467554
+          }
+        }
+      },
+      "observed_attack_retention": 0.615397646046717,
+      "observed_source_ga_p90": 0.37139840425312703,
+      "observed_target_ga_p90": 0.22855770372288137,
+      "observed_attack_retention_p10": 0.4213637117862522,
+      "observed_attack_retention_p90": 0.8255643263748849
+    },
+    "971": {
+      "name": "UAE Pro League",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 0.26463168516649843,
+      "observed_source_ga_p90": 0.686367969494757,
+      "observed_target_ga_p90": 0.18163471241170534
+    },
+    "984": {
+      "name": "Tunisian Ligue Professionnelle 1",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.0,
+      "observed_source_ga_p90": 0.0,
+      "observed_target_ga_p90": 0.053827751196172245
+    },
+    "11539": {
+      "name": "Primera A",
+      "n_players": 1,
+      "positions": {},
+      "observed_attack_retention": 1.0,
+      "observed_source_ga_p90": 0.0,
+      "observed_target_ga_p90": 0.04087193460490463
+    },
+    "11621": {
+      "name": "Liga MX, Apertura",
+      "n_players": 4,
+      "positions": {},
+      "observed_attack_retention": 1.1743248720227264,
+      "observed_source_ga_p90": 0.2493221958476142,
+      "observed_target_ga_p90": 0.29278525573117464,
+      "observed_attack_retention_p10": 0.4540915416988553,
+      "observed_attack_retention_p90": 3.411063250026421
+    },
+    "11653": {
+      "name": "Liga de Primera",
+      "n_players": 2,
+      "positions": {},
+      "observed_attack_retention": 0.48936119138146256,
+      "observed_source_ga_p90": 0.24601188610606434,
+      "observed_target_ga_p90": 0.12038866967886432
+    }
+  },
+  "validation": {
+    "DF:goals_p90": {
+      "prior_players": 40.0,
+      "strength": 1.0,
+      "cv_mae": 0.0452539074069372,
+      "identity_mae": 0.06060338857359425
+    },
+    "MF:goals_p90": {
+      "prior_players": 20.0,
+      "strength": 0.75,
+      "cv_mae": 0.08609170411001896,
+      "identity_mae": 0.10215430442152111
+    },
+    "FW:goals_p90": {
+      "prior_players": 5.0,
+      "strength": 0.75,
+      "cv_mae": 0.15177805581023962,
+      "identity_mae": 0.19962244401629128
+    },
+    "DF:assists_p90": {
+      "prior_players": 5.0,
+      "strength": 0.75,
+      "cv_mae": 0.04347660856165637,
+      "identity_mae": 0.04841838923569418
+    },
+    "MF:assists_p90": {
+      "prior_players": 160.0,
+      "strength": 1.0,
+      "cv_mae": 0.08697873718486597,
+      "identity_mae": 0.10258762360210928
+    },
+    "FW:assists_p90": {
+      "prior_players": 5.0,
+      "strength": 1.0,
+      "cv_mae": 0.07741150544548359,
+      "identity_mae": 0.10711513890400232
+    },
+    "DF:xg_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.5,
+      "cv_mae": 0.02500691584286972,
+      "identity_mae": 0.02600433811133435
+    },
+    "MF:xg_p90": {
+      "prior_players": 10.0,
+      "strength": 1.0,
+      "cv_mae": 0.044663764564140576,
+      "identity_mae": 0.07599844889375182
+    },
+    "FW:xg_p90": {
+      "prior_players": 20.0,
+      "strength": 0.5,
+      "cv_mae": 0.14459364596620852,
+      "identity_mae": 0.1472199946243597
+    },
+    "DF:xa_p90": {
+      "prior_players": 5.0,
+      "strength": 0.0,
+      "cv_mae": 0.028039922931714666,
+      "identity_mae": 0.028039922931714666
+    },
+    "MF:xa_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 1.0,
+      "cv_mae": 0.04726276185152326,
+      "identity_mae": 0.054118045965828525
+    },
+    "FW:xa_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.75,
+      "cv_mae": 0.04845410811345434,
+      "identity_mae": 0.04988739459291356
+    },
+    "DF:shots_on_target_p90": {
+      "prior_players": 40.0,
+      "strength": 1.0,
+      "cv_mae": 0.08758167951397945,
+      "identity_mae": 0.11086937460017283
+    },
+    "MF:shots_on_target_p90": {
+      "prior_players": 20.0,
+      "strength": 0.75,
+      "cv_mae": 0.19728922878563004,
+      "identity_mae": 0.2141444439986171
+    },
+    "FW:shots_on_target_p90": {
+      "prior_players": 10.0,
+      "strength": 0.75,
+      "cv_mae": 0.26251068698858077,
+      "identity_mae": 0.3526882507615774
+    },
+    "DF:key_passes_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.75,
+      "cv_mae": 0.19829430534790912,
+      "identity_mae": 0.22157303372838863
+    },
+    "MF:key_passes_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.75,
+      "cv_mae": 0.40991938286084667,
+      "identity_mae": 0.43909139174241524
+    },
+    "FW:key_passes_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.5,
+      "cv_mae": 0.30817405380988677,
+      "identity_mae": 0.3434658304396117
+    },
+    "GK:yellow_cards_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 1.0,
+      "cv_mae": 0.07520588894391664,
+      "identity_mae": 0.08087937093917451
+    },
+    "DF:yellow_cards_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.75,
+      "cv_mae": 0.08854615340841544,
+      "identity_mae": 0.1078351494139705
+    },
+    "MF:yellow_cards_p90": {
+      "prior_players": 10.0,
+      "strength": 0.75,
+      "cv_mae": 0.10369812709806589,
+      "identity_mae": 0.128639572074579
+    },
+    "FW:yellow_cards_p90": {
+      "prior_players": 5.0,
+      "strength": 1.0,
+      "cv_mae": 0.08703954572140893,
+      "identity_mae": 0.10582408403083737
+    },
+    "GK:red_cards_p90": {
+      "prior_players": 5.0,
+      "strength": 1.0,
+      "cv_mae": 0.0064108616108447146,
+      "identity_mae": 0.008530504527310138
+    },
+    "DF:red_cards_p90": {
+      "prior_players": 5.0,
+      "strength": 0.0,
+      "cv_mae": 0.016889193365202133,
+      "identity_mae": 0.016889193365202133
+    },
+    "MF:red_cards_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 1.0,
+      "cv_mae": 0.017700043578391948,
+      "identity_mae": 0.01962502361343549
+    },
+    "FW:red_cards_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 1.0,
+      "cv_mae": 0.014296678656534261,
+      "identity_mae": 0.01795505989873125
+    },
+    "GK:saves_p90": {
+      "prior_players": 5.0,
+      "strength": 0.5,
+      "cv_mae": 0.5929437636541972,
+      "identity_mae": 0.633758700138875
+    },
+    "GK:goals_conceded_p90": {
+      "prior_players": 1000000000.0,
+      "strength": 0.5,
+      "cv_mae": 0.2707705251483869,
+      "identity_mae": 0.3159859549766738
+    },
+    "GK:clean_sheet_rate": {
+      "prior_players": 1000000000.0,
+      "strength": 0.75,
+      "cv_mae": 0.0860386046086516,
+      "identity_mae": 0.10840662030740378
+    },
+    "DF:clean_sheet_rate": {
+      "prior_players": 80.0,
+      "strength": 1.0,
+      "cv_mae": 0.08479442403429656,
+      "identity_mae": 0.13362201075518548
+    },
+    "MF:clean_sheet_rate": {
+      "prior_players": 5.0,
+      "strength": 0.75,
+      "cv_mae": 0.06695577324098044,
+      "identity_mae": 0.0806690431474511
+    },
+    "GK:minutes_per_app": {
+      "prior_players": 5.0,
+      "strength": 0.0,
+      "cv_mae": 1.5712626869200166,
+      "identity_mae": 1.5712626869200166
+    },
+    "DF:minutes_per_app": {
+      "prior_players": 20.0,
+      "strength": 0.75,
+      "cv_mae": 8.940957732017424,
+      "identity_mae": 10.369602002832526
+    },
+    "MF:minutes_per_app": {
+      "prior_players": 80.0,
+      "strength": 0.75,
+      "cv_mae": 12.64752943429841,
+      "identity_mae": 16.07967771079033
+    },
+    "FW:minutes_per_app": {
+      "prior_players": 1000000000.0,
+      "strength": 1.0,
+      "cv_mae": 13.378412003333398,
+      "identity_mae": 19.50076456959219
+    },
+    "GK:rating": {
+      "prior_players": 1000000000.0,
+      "strength": 0.75,
+      "cv_mae": 0.11889112062990953,
+      "identity_mae": 0.14723537350338595
+    },
+    "DF:rating": {
+      "prior_players": 5.0,
+      "strength": 1.0,
+      "cv_mae": 0.12818656397415876,
+      "identity_mae": 0.17942025132661024
+    },
+    "MF:rating": {
+      "prior_players": 20.0,
+      "strength": 0.75,
+      "cv_mae": 0.15520762958542203,
+      "identity_mae": 0.19870397990620278
+    },
+    "FW:rating": {
+      "prior_players": 5.0,
+      "strength": 0.75,
+      "cv_mae": 0.18832340648364596,
+      "identity_mae": 0.2487997428971496
+    }
+  }
+}

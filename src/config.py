@@ -27,8 +27,6 @@ FORMATIONS: dict[str, dict[str, int]] = {
     "5-2-3": {"GK": 1, "DF": 5, "MF": 2, "FW": 3},
 }
 BENCH_WEIGHT = 0.50  # otomatik yedek girişi; 4 yedeğin hepsi her hafta girmez
-NEW_SIGNING_MULT = 1.0
-LOW_SAMPLE_MULT = 1.0
 
 # TFF availabilityStatus
 AVAIL_MULT = {
@@ -47,8 +45,9 @@ BCC_TO_ASSIST = 0.22
 
 # Form penceresi
 FORM_MATCHES = 6
-MIN_APPS_FOR_CURRENT_BASE = 8
 FORM_WEAK_APPS = 4
+# 10 dakikalık form cameo'su sezon G/A oranını ezmesin.
+MIN_FORM_MINUTES_FOR_RATES = 45.0
 
 # Son 6 maç önemlidir ama küçük örnektir; sezon üretimini ezmemeli.
 W_FORM_DEFAULT = 0.30

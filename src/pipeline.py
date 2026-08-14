@@ -15,6 +15,7 @@ from .fetch_external import apply_external_priors
 from .fetch_fotmob import apply_fotmob_validation
 from .fetch_stats import load_dual_season_stats
 from .load_prices import load_prices, merge_prices
+from .names import normalize_name
 from .optimize import optimize_squad
 from .scoring import (
     apply_context_adjustments,
@@ -115,8 +116,24 @@ def run_pipeline(
     prices = load_prices(prices_path)
     merged = merge_prices(players, prices)
     fixture_context = meta.get("fixture_context") or {}
+    cs_context = {
+        normalize_name(str(team)): {"cs_rate": float(rate)}
+        for team, rate in (base_cs or {}).items()
+    }
+    cs_values = [
+        float(rate)
+        for rate in (base_cs or {}).values()
+        if rate is not None and pd.notna(rate)
+    ]
+    league_cs = float(pd.Series(cs_values).median()) if cs_values else 0.28
     for idx, row in merged.iterrows():
-        fixture = lookup_fixture_context(str(row.get("team") or ""), fixture_context)
+        team_name = str(row.get("team") or "")
+        cs = lookup_fixture_context(team_name, cs_context)
+        if cs and cs.get("cs_rate") is not None:
+            merged.at[idx, "team_cs_base"] = float(cs["cs_rate"])
+        elif pd.isna(row.get("team_cs_base")):
+            merged.at[idx, "team_cs_base"] = league_cs
+        fixture = lookup_fixture_context(team_name, fixture_context)
         if fixture:
             merged.at[idx, "fixture_opponent"] = fixture.get("opponent") or ""
             merged.at[idx, "fixture_home"] = fixture.get("home")
@@ -129,6 +146,11 @@ def run_pipeline(
     _say(progress, "FotMob ikinci kaynak (ilk 11 + güncel kulüp maçları)...")
     merged = apply_fotmob_validation(merged, progress=progress)
     merged = apply_context_adjustments(merged)
+    prices_numeric = pd.to_numeric(merged["price_m"], errors="coerce").replace(0, pd.NA)
+    merged["ppm"] = (
+        pd.to_numeric(merged["projected_pts"], errors="coerce").fillna(0.0)
+        / prices_numeric
+    ).fillna(0.0)
     ext_n = int((merged.get("data_src") == "external_prior").sum()) if "data_src" in merged.columns else 0
     _say(progress, f"En iyi diziliş + XI + yedek optimize ediliyor ({ext_n} yeni imza)...")
 
@@ -184,7 +206,8 @@ def run_pipeline(
                 "dakika (60+=2p) + xG/xA + şut/kilit pas + CS/kart/bonus/penaltı; "
                 "mevcut/önceki sezon örnek küçültme; haftalık rakip ve iç/dış saha; "
                 "Sofascore + FotMob ilk 11/xG/güncel maç doğrulaması; "
-                "resmî TFF puan kalibrasyonu; yeni imza son 1–2 lig sezonu; "
+                "resmî TFF puan kalibrasyonu; yeni imza son 1–2 lig sezonu ve "
+                "geçmiş lig→SL transferlerinden ileri-zaman doğrulanmış dönüşüm; "
                 "diziliş otomatik (4-4-2/4-5-1/3-5-2…); yedek otomatik giriş."
             ),
         }

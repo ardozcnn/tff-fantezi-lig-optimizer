@@ -16,10 +16,9 @@ from .config import (
     FORM_WEAK_APPS,
     GOAL_POINTS,
     KEYPASS_TO_ASSIST,
-    LOW_SAMPLE_MULT,
     MIN_60_POINTS,
+    MIN_FORM_MINUTES_FOR_RATES,
     MIN_FULL_POINTS,
-    NEW_SIGNING_MULT,
     OWN_GOAL_PENALTY,
     PENALTY_MISS_PENALTY,
     PENALTY_SAVE_POINTS,
@@ -262,7 +261,12 @@ def expected_points_from_rates(
     cs_rate = max(0.0, min(1.0, cs_rate * cs_mult))
     if pos in ("GK", "DF"):
         cs_pts = appearance * cs_rate * share_60 * CS_POINTS[pos]
-        ga_pa = rates.get("ga_pa") or (1.0 - cs_rate) * 1.2
+        # Takım CS olasılığı verildiyse aynı savunma tahmininden yenen golü de
+        # Poisson P(0)=e^-lambda ile türet; eski kulübün GA oranıyla çelişmesin.
+        if team_cs_rate is not None:
+            ga_pa = -math.log(max(0.03, min(0.97, cs_rate)))
+        else:
+            ga_pa = rates.get("ga_pa") or (1.0 - cs_rate) * 1.2
         concede_pen = (
             appearance
             * _expected_concede_penalty(ga_pa)
@@ -306,10 +310,6 @@ def expected_points_from_rates(
     )
 
 
-def _squad_key(name: str) -> str:
-    return normalize_name(name)
-
-
 def blend_weights(form_apps: float) -> tuple[float, float]:
     if form_apps < FORM_WEAK_APPS:
         return W_FORM_WEAK, W_BASE_WEAK
@@ -320,6 +320,18 @@ def _recency_multiplier(form_apps: float, form_matches: float) -> float:
     recent_matches = max(1.0, float(form_matches or 0))
     recent_presence = min(1.0, max(0.0, form_apps) / recent_matches)
     return 0.65 + 0.35 * recent_presence
+
+
+def recency_for_projection(
+    form_apps: float,
+    form_matches: float,
+    *,
+    preseason: bool = False,
+) -> float:
+    """Yeni sezon maçı yoksa geçen sezonun L6'sı bu haftanın XI sinyali değildir."""
+    if preseason:
+        return 1.0
+    return _recency_multiplier(form_apps, form_matches)
 
 
 def _blend_rate_sets(
@@ -420,6 +432,7 @@ def build_player_table(
 
         form_rates = _row_rates(form_row) if form_row is not None else _empty_rates()
         form_apps = form_rates["apps"]
+        form_minutes = float(form_row.get("minutes") or 0) if form_row is not None else 0.0
 
         # Mevcut sezonu 8 maç altındayken tamamen atmak ciddi hataydı:
         # 7 maçlık 25/26 Hajradinović yerine 24/25'i kullanıyordu.
@@ -450,6 +463,21 @@ def build_player_table(
             if (form_rates.get(k) or 0) <= 0 and (base_rates.get(k) or 0) > 0:
                 form_rates[k] = base_rates[k]
 
+        # 10 dk'lık son maç xG'si sezon üretimini şişirmesin; form yalnızca
+        # oynama sinyali olarak kalsın (recency). Hücum/CS sezon bazından gelir.
+        form_for_points = form_rates
+        form_mpa = float(form_rates.get("min_per_app") or 0.0)
+        if (
+            form_mpa < MIN_FORM_MINUTES_FOR_RATES
+            and form_minutes < 150
+            and base_rates.get("apps", 0) >= 6
+            and base_rates.get("min_per_app", 0) >= 45
+        ):
+            form_for_points = {
+                **base_rates,
+                "apps": max(form_rates.get("apps") or 0.0, 1.0),
+            }
+
         team_form_cs = _lookup_cs(squad, form_cs)
         team_base_cs = _lookup_cs(squad, base_cs)
         fixture = lookup_fixture_context(squad, fixture_context)
@@ -457,7 +485,7 @@ def build_player_table(
         fixture_cs = float(fixture.get("cs_mult") or 1.0)
 
         form_pts = expected_points_from_rates(
-            form_rates,
+            form_for_points,
             position,
             team_form_cs,
             attack_mult=fixture_attack,
@@ -482,7 +510,11 @@ def build_player_table(
         # oynama ihtimali için güçlü negatif sinyaldir. Sezon bazı bunu ezmesin.
         recent_matches = max(1.0, float(meta.get("form_matches") or 6))
         if cur_rates.get("apps", 0) > 0 and not current.empty:
-            recency_mult = _recency_multiplier(form_apps, recent_matches)
+            recency_mult = recency_for_projection(
+                form_apps,
+                recent_matches,
+                preseason=bool(meta.get("preseason")),
+            )
             projected *= recency_mult
         else:
             recency_mult = 1.0
@@ -490,29 +522,30 @@ def build_player_table(
         if base_rates.get("min_per_app", 0) < 20 and form_rates.get("min_per_app", 0) < 20:
             projected *= 0.35
 
+        show_rates = form_for_points if form_for_points.get("min_per_app", 0) >= 45 else base_rates
         reason_bits = []
         if position in ("DF", "GK"):
             reason_bits.append(f"CS~{(team_form_cs if team_form_cs is not None else form_rates.get('cs_rate', 0)):.0%}")
             if form_rates.get("int_p90", 0) > 0:
                 reason_bits.append(f"Int/90={form_rates['int_p90']:.1f}")
-        gls_show = form_rates.get("gls_pa") or base_rates.get("gls_pa") or 0
-        ast_show = form_rates.get("ast_pa") or base_rates.get("ast_pa") or 0
-        xg_show = form_rates.get("xg_pa") or base_rates.get("xg_pa") or 0
-        xa_show = form_rates.get("xa_pa") or base_rates.get("xa_pa") or 0
-        exp_g = _blend_attack(gls_show, xg_show, (form_rates.get("sot_pa") or base_rates.get("sot_pa") or 0) * SOT_TO_GOAL)
+        gls_show = show_rates.get("gls_pa") or 0
+        ast_show = show_rates.get("ast_pa") or 0
+        xg_show = show_rates.get("xg_pa") or 0
+        xa_show = show_rates.get("xa_pa") or 0
+        exp_g = _blend_attack(gls_show, xg_show, (show_rates.get("sot_pa") or 0) * SOT_TO_GOAL)
         exp_a = _blend_attack(
             ast_show,
             xa_show,
             max(
-                (form_rates.get("key_passes_pa") or base_rates.get("key_passes_pa") or 0) * KEYPASS_TO_ASSIST,
-                (form_rates.get("bcc_pa") or base_rates.get("bcc_pa") or 0) * BCC_TO_ASSIST,
+                (show_rates.get("key_passes_pa") or 0) * KEYPASS_TO_ASSIST,
+                (show_rates.get("bcc_pa") or 0) * BCC_TO_ASSIST,
             ),
         )
         if exp_g + exp_a + gls_show + ast_show > 0:
             reason_bits.append(
                 f"beklenen G/A={exp_g:.2f}/{exp_a:.2f} (ham {gls_show:.2f}/{ast_show:.2f}, xG/xA {xg_show:.2f}/{xa_show:.2f})"
             )
-        share = form_rates.get("share_60") or base_rates.get("share_60") or 0
+        share = show_rates.get("share_60") or base_rates.get("share_60") or 0
         reason_bits.append(f"60+ dk ~{share:.0%} → {1 + share:.1f}p dakika")
         if fixture:
             venue = "iç saha" if fixture.get("home") else "deplasman"
@@ -541,16 +574,17 @@ def build_player_table(
                 "tkl_p90": round(
                     form_rates.get("tkl_p90", 0.0) or base_rates.get("tkl_p90", 0.0), 2
                 ),
-                "gls_pa": round(form_rates.get("gls_pa", 0.0) or base_rates.get("gls_pa", 0.0), 3),
-                "ast_pa": round(form_rates.get("ast_pa", 0.0) or base_rates.get("ast_pa", 0.0), 3),
-                "xg_pa": round(form_rates.get("xg_pa", 0.0) or base_rates.get("xg_pa", 0.0), 3),
-                "xa_pa": round(form_rates.get("xa_pa", 0.0) or base_rates.get("xa_pa", 0.0), 3),
-                "share_60": round(form_rates.get("share_60") or base_rates.get("share_60") or 0.0, 3),
+                "gls_pa": round(show_rates.get("gls_pa", 0.0) or base_rates.get("gls_pa", 0.0), 3),
+                "ast_pa": round(show_rates.get("ast_pa", 0.0) or base_rates.get("ast_pa", 0.0), 3),
+                "xg_pa": round(show_rates.get("xg_pa", 0.0) or base_rates.get("xg_pa", 0.0), 3),
+                "xa_pa": round(show_rates.get("xa_pa", 0.0) or base_rates.get("xa_pa", 0.0), 3),
+                "share_60": round(show_rates.get("share_60") or base_rates.get("share_60") or 0.0, 3),
                 "min_per_app": round(
-                    form_rates.get("min_per_app") or base_rates.get("min_per_app") or 0.0,
+                    show_rates.get("min_per_app") or base_rates.get("min_per_app") or 0.0,
                     1,
                 ),
                 "team_cs_form": team_form_cs,
+                "team_cs_base": team_base_cs,
                 "fixture_opponent": fixture.get("opponent") or "",
                 "fixture_home": fixture.get("home"),
                 "fixture_attack_mult": fixture_attack,
@@ -626,20 +660,12 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     if "projected_pts" not in out.columns:
         return out
     out["raw_pts"] = pd.to_numeric(out["projected_pts"], errors="coerce").fillna(0.0)
-    src = out["data_src"].astype(str) if "data_src" in out.columns else ""
     form_apps = pd.to_numeric(out.get("form_apps", 0), errors="coerce").fillna(0.0)
-    price = pd.to_numeric(out["price_m"], errors="coerce").fillna(0.0)
-
-    ext = src == "external_prior" if isinstance(src, pd.Series) else False
-    low = (~ext) & (form_apps < 4) & (price >= 7.0) if isinstance(src, pd.Series) else False
-
     pts = out["raw_pts"].copy()
-    if isinstance(ext, pd.Series):
-        pts = pts.where(~ext, pts * NEW_SIGNING_MULT)
-        pts = pts.where(~low, pts * LOW_SAMPLE_MULT)
 
     # Sezon başladıktan sonra resmî TFF gerçekleşen puanını düşük ağırlıkla kalibre et.
-    # Bu alanlar sezon başında sıfırdır; o durumda model değişmez.
+    # Geçen sezonun tam TFF özeti, yeni sezonun ilk haftalarında Asensio gibi
+    # oyuncuları çift saymasın.
     zeros = pd.Series(0.0, index=out.index)
     tff_minutes = pd.to_numeric(out.get("tff_minutes", zeros), errors="coerce").fillna(0.0)
     tff_starts = pd.to_numeric(out.get("tff_starts", zeros), errors="coerce").fillna(0.0)
@@ -653,7 +679,8 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         tff_points / official_apps.where(official_apps > 0, 1.0),
     )
     official_weight = (official_apps / 30.0).clip(lower=0.0, upper=0.35)
-    has_official = tff_minutes > 0
+    leftover_full_season = (tff_minutes >= 900) & (form_apps < 3)
+    has_official = (tff_minutes > 0) & ~leftover_full_season
     pts = pts.where(
         ~has_official,
         (1.0 - official_weight) * pts + official_weight * official_ppg,
@@ -692,13 +719,3 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
 
     out["reason"] = out.apply(_note, axis=1)
     return out
-
-
-def position_leaders(players: pd.DataFrame, n: int = 8) -> dict[str, pd.DataFrame]:
-    leaders: dict[str, pd.DataFrame] = {}
-    for pos in ("GK", "DF", "MF", "FW"):
-        sub = players[players["position"] == pos].sort_values(
-            "projected_pts", ascending=False
-        ).head(n)
-        leaders[pos] = sub
-    return leaders

@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
 from typing import Any, Callable
 from urllib.parse import quote
 
 import pandas as pd
 
 from .fetch_stats import apply_overall_fields, sofa_get
+from .league_translation import (
+    load_translation_model,
+    translate_external_rates,
+    translate_metric_mixture,
+)
 from .names import best_match, name_variants, normalize_name
 from .scoring import expected_points_from_rates, map_position, rates_from_totals
 
@@ -20,44 +26,24 @@ DOMESTIC_LEAGUES: dict[int, str] = {
     35: "Bundesliga",
     34: "Ligue 1",
     37: "Eredivisie",
-    238: "Belgian Pro League",
-    215: "Liga Portugal",
-    44: "Liga Portugal",
+    238: "Liga Portugal",
+    215: "Swiss Super League",
+    44: "2. Bundesliga",
     18: "Championship",
-    172: "Championship",
+    172: "Czech First League",
     955: "Saudi Pro League",
-    196: "MLS",
-    242: "Liga MX",
-    45: "Superliga",
-    170: "Bundesliga 2",
-    36: "2. Bundesliga",
+    196: "J1 League",
+    242: "MLS",
+    45: "Austrian Bundesliga",
+    170: "HNL",
+    36: "Scottish Premiership",
     182: "Ligue 2",
-    53: "Süper Lig",
+    53: "Serie B",
+    98: "Trendyol 1.Lig",
     52: "Süper Lig",
-    373: "UEFA Europa League",
-    679: "UEFA Europa League",
 }
 
-# Dış lig hücum çarpanı (üst lig → SL biraz daha kolay)
-ATTACK_MULT = {
-    17: 1.10,
-    8: 1.07,
-    23: 1.07,
-    35: 1.07,
-    34: 1.07,
-    7: 1.02,  # UCL
-    679: 1.05,
-    373: 1.05,
-}
-CS_MULT = {
-    17: 0.92,
-    8: 0.94,
-    23: 0.94,
-    35: 0.93,
-    34: 0.94,
-}
-
-EURO_IDS = {7, 679, 373}  # UCL, UEL, UECL
+EURO_IDS = {7, 679, 17015}  # UCL, UEL, UECL
 
 SKIP_TOURNAMENTS = {
     16,  # World Cup
@@ -70,9 +56,83 @@ SKIP_TOURNAMENTS = {
     19,  # FA Cup
     10783,  # Nations League
     133,  # Copa America
+    373,  # Copa do Brasil
 }
 
 ProgressCb = Callable[[str], None] | None
+
+
+_CUP_MARKERS = {
+    "cup",
+    "kupa",
+    "kupasi",
+    "pokal",
+    "copa",
+    "coppa",
+    "taca",
+    "champions",
+    "europa",
+    "conference",
+    "qualification",
+    "friendl",
+    "nations",
+    "u19",
+    "u21",
+}
+_LEAGUE_MARKERS = {
+    "league",
+    "lig",
+    "liga",
+    "ligue",
+    "bundesliga",
+    "serie",
+    "championship",
+    "eredivisie",
+    "superliga",
+    "premiership",
+    "division",
+    "allsvenskan",
+    "eliteserien",
+    "ekstraklasa",
+    "mls",
+    "veikkausliiga",
+    "hnl",
+}
+
+
+@lru_cache(maxsize=256)
+def tournament_metadata(tournament_id: int) -> dict[str, Any]:
+    """Canlı Sofascore metadata; eski elle yazılmış ID etiketlerine güvenme."""
+    try:
+        payload = sofa_get(
+            f"/unique-tournament/{int(tournament_id)}",
+            cache_key=f"sofa_tournament_meta_{int(tournament_id)}",
+            max_age_hours=24 * 30,
+            delay=0.08,
+        )
+    except Exception:
+        return {}
+    tournament = payload.get("uniqueTournament") or payload
+    category = tournament.get("category") or {}
+    return {
+        "name": tournament.get("name") or "",
+        "tier": tournament.get("tier"),
+        "category": category.get("name") or "",
+    }
+
+
+def is_domestic_league(tournament_id: int, tournament: str) -> bool:
+    if tournament_id in EURO_IDS or tournament_id in SKIP_TOURNAMENTS:
+        return False
+    name = normalize_name(tournament)
+    if any(marker in name for marker in _CUP_MARKERS):
+        return False
+    if tournament_id in DOMESTIC_LEAGUES:
+        return True
+    if any(marker in name.split() or marker in name for marker in _LEAGUE_MARKERS):
+        return True
+    tier = tournament_metadata(tournament_id).get("tier")
+    return tier in (1, 2)
 
 
 def search_players(query: str) -> list[dict[str, Any]]:
@@ -169,7 +229,7 @@ def player_tournament_seasons(player_id: int) -> list[dict[str, Any]]:
                     "season_id": int(sid),
                     "year": season.get("year") or "",
                     "season_name": season.get("name") or "",
-                    "domestic": int(tid) in DOMESTIC_LEAGUES,
+                    "domestic": is_domestic_league(int(tid), str(tname)),
                 }
             )
     return rows
@@ -254,12 +314,8 @@ def choose_prior_season(player_id: int) -> tuple[dict[str, Any], dict[str, Any]]
     if not seasons:
         return None
 
-    domestic = [r for r in seasons if r["domestic"] and r["tournament_id"] not in (52, 53)]
-    other = [
-        r
-        for r in seasons
-        if not r["domestic"] and r["tournament_id"] not in (52, 53, *SKIP_TOURNAMENTS)
-    ]
+    domestic = [r for r in seasons if r["domestic"] and r["tournament_id"] != 52]
+    other = [r for r in seasons if r["tournament_id"] in EURO_IDS]
     domestic.sort(key=lambda r: r["year"], reverse=True)
     other.sort(key=lambda r: r["year"], reverse=True)
 
@@ -297,6 +353,7 @@ def choose_prior_season(player_id: int) -> tuple[dict[str, Any], dict[str, Any]]
     latest_meta, latest_st = collected[0]
     scale = max(_apps(latest_st), 10.0)
     parts: list[tuple[dict[str, Any], float]] = [(latest_st, 0.70)]
+    league_parts: list[tuple[dict[str, Any], float]] = [(latest_meta, 0.70)]
     note = latest_meta.get("tournament") or ""
 
     if len(collected) >= 2:
@@ -311,6 +368,7 @@ def choose_prior_season(player_id: int) -> tuple[dict[str, Any], dict[str, Any]]
         )
         w_latest, w_prev = (0.48, 0.52) if down else (0.68, 0.32)
         parts = [(latest_st, w_latest), (prev_st, w_prev)]
+        league_parts = [(latest_meta, w_latest), (prev_meta, w_prev)]
         note = (
             f"{latest_meta.get('tournament')} {latest_meta.get('year')} "
             f"+ {prev_meta.get('tournament')} {prev_meta.get('year')} karışım"
@@ -337,6 +395,26 @@ def choose_prior_season(player_id: int) -> tuple[dict[str, Any], dict[str, Any]]
             note = f"{note}; +{cand.get('tournament') or 'Avrupa'}"
             latest_meta["blend_note"] = note
             latest_meta["season_name"] = note
+
+    combined_mix: dict[int, dict[str, Any]] = {}
+    for meta, weight in league_parts:
+        tid = int(meta.get("tournament_id") or 0)
+        if not tid:
+            continue
+        entry = combined_mix.setdefault(
+            tid,
+            {
+                "tournament_id": tid,
+                "tournament": meta.get("tournament") or "",
+                "weight": 0.0,
+            },
+        )
+        entry["weight"] = float(entry["weight"]) + float(weight)
+    mix_total = sum(float(part["weight"]) for part in combined_mix.values()) or 1.0
+    latest_meta["league_mix"] = [
+        {**part, "weight": float(part["weight"]) / mix_total}
+        for part in combined_mix.values()
+    ]
 
     blended = mix_overall(parts, scale)
     return latest_meta, blended
@@ -421,6 +499,7 @@ def stats_row_from_overall(
         "tournament": meta.get("tournament") or "",
         "tournament_id": meta.get("tournament_id"),
         "blend_note": meta.get("blend_note") or "",
+        "league_mix": meta.get("league_mix") or [],
     }
     apply_overall_fields(row, st)
     row["mp"] = float(row.get("mp") or mp)
@@ -466,11 +545,36 @@ def project_external_player(
     price_m: float,
     fixture_attack_mult: float = 1.0,
     fixture_cs_mult: float = 1.0,
+    team_cs_rate: float | None = None,
 ) -> dict[str, Any]:
-    rates = rates_from_totals(row)
+    source_rates = rates_from_totals(row)
     friendly_min = float(row.get("friendly_minutes") or 0)
-    min_pa = minutes_prior(price_m, rates.get("min_per_app") or 0.0, friendly_min)
-    rates["min_per_app"] = min_pa
+    tid = int(row.get("tournament_id") or 0)
+    translation_model = load_translation_model()
+    league_mix = row.get("league_mix")
+    if not isinstance(league_mix, list) or not league_mix:
+        league_mix = [
+            {
+                "tournament_id": tid,
+                "tournament": row.get("tournament") or "",
+                "weight": 1.0,
+            }
+        ]
+    translated_role, _ = translate_metric_mixture(
+        translation_model,
+        league_mix,
+        tff_position,
+        "minutes_per_app",
+        float(source_rates.get("min_per_app") or 0.0),
+    )
+    min_pa = minutes_prior(price_m, translated_role, friendly_min)
+    rates, calibration = translate_external_rates(
+        source_rates,
+        row,
+        tff_position,
+        min_pa,
+        model=translation_model,
+    )
     if min_pa >= 60:
         rates["share_60"] = min(1.0, 0.55 + (min_pa - 60) / 60.0)
     elif min_pa >= 1:
@@ -478,18 +582,15 @@ def project_external_player(
     else:
         rates["share_60"] = 0.0
 
-    tid = int(row.get("tournament_id") or 0)
-    attack_mult = (
-        ATTACK_MULT.get(tid, 1.04 if row.get("tournament") else 1.0)
-        * fixture_attack_mult
-    )
-    cs_mult = CS_MULT.get(tid, 1.0)
+    target_cs = team_cs_rate
+    if target_cs is None:
+        target_cs = rates.get("cs_rate") or 0.0
     pts = expected_points_from_rates(
         rates,
         tff_position,
-        team_cs_rate=(rates.get("cs_rate") or 0.0) * cs_mult,
+        team_cs_rate=target_cs,
         appearance=appearance_prior(price_m, rates.get("apps") or 0.0, friendly_min),
-        attack_mult=attack_mult,
+        attack_mult=fixture_attack_mult,
         cs_mult=fixture_cs_mult,
     )
     season = str(row.get("season") or "").strip()
@@ -503,13 +604,38 @@ def project_external_player(
         src = f"{tourn} {season}".strip() or "dış lig"
     exp_g = rates.get("gls_pa") or 0
     exp_a = rates.get("ast_pa") or 0
+    calibration_level = str(calibration.get("level") or "identity")
+    calibration_n = int(calibration.get("n_players") or 0)
+    attack_factor = float(calibration.get("attack_factor") or 1.0)
+    calibration_name = str(calibration.get("league") or tourn or "dış lig")
+    if calibration_level == "league":
+        calibration_note = (
+            f"yaklaşık {calibration_n} geçmiş {calibration_name}→SL örneğiyle "
+            f"bu profil hücum dönüşümü ×{attack_factor:.2f}"
+        )
+    elif calibration_level == "tier":
+        calibration_note = (
+            f"lig örneği zayıf; aynı seviye liglerden {calibration_n} transferlik "
+            f"mevki modeli, hücum ×{attack_factor:.2f}"
+        )
+    elif calibration_level == "global":
+        calibration_note = (
+            f"lig örneği zayıf; {calibration_n} transferlik mevki geneline küçültme"
+        )
+    else:
+        calibration_note = "tarihsel kalibrasyon bulunamadı; kaynak oranı korundu"
+    identity_mix = float(calibration.get("identity_mix") or 0.0)
+    if identity_mix >= 0.08:
+        calibration_note += (
+            f"; yüksek tempolu profil kaynak orana {identity_mix:.0%} karıştı"
+        )
     reason = (
         f"Yeni transfer: {src}; "
         f"maç başı G/A kapasitesi ~{rates.get('xg_pa') or exp_g:.2f}/{rates.get('xa_pa') or exp_a:.2f} "
         f"(ham {row.get('gls', 0):.0f}G/{row.get('ast', 0):.0f}A, "
         f"xG/xA {row.get('xg', 0):.1f}/{row.get('xa', 0):.1f}, "
         f"{rates.get('apps', 0):.0f} maç ölçeği); "
-        f"TFF {tff_position}"
+        f"{calibration_note}; TFF {tff_position}"
     )
     return {
         "projected_pts": round(float(pts), 3),
@@ -539,6 +665,10 @@ def project_external_player(
         "ext_minutes": row.get("minutes") or 0,
         "rating": row.get("rating") or 0,
         "friendly_minutes": friendly_min,
+        "ext_tournament_id": tid,
+        "league_attack_factor": round(attack_factor, 3),
+        "league_calibration_n": calibration_n,
+        "league_calibration_level": calibration_level,
     }
 
 
@@ -610,8 +740,8 @@ def apply_external_priors(
     merged: pd.DataFrame,
     *,
     progress: ProgressCb = None,
-    min_price: float = 5.5,
-    max_fetch: int = 90,
+    min_price: float = 4.0,
+    max_fetch: int = 180,
 ) -> pd.DataFrame:
     """SL örneği zayıf / eşleşmeyen pahalı oyunculara son lig sezonunu bağla."""
     df = merged.copy()
@@ -641,16 +771,14 @@ def apply_external_priors(
             return False
         unmatched = pd.isna(r.get("stats_player")) or not str(r.get("stats_player") or "").strip()
         sl_apps = float(r.get("form_apps") or 0) + float(r.get("base_apps") or 0)
-        pts = float(r.get("projected_pts") or 0)
+        sl_minutes = float(r.get("min_per_app") or 0) * sl_apps
         if unmatched:
             return True
-        # Eşleşmiş ve en az 4 SL maçı olan oyuncuyu eski dış lig verisiyle ezme.
-        # Örn. 25/26'da 7 maçı olan Hajradinović'e 2018/19 HNL bağlanıyordu.
-        if sl_apps >= 4:
+        # Eşleşmiş ve gerçek SL dakikası olan oyuncuyu eski dış lig verisiyle ezme.
+        # 4 cameo (10'ar dk) yeterli örnek sayılmaz; Hajradinović gibi 7x60+ kalır.
+        if sl_apps >= 4 and sl_minutes >= 240:
             return False
-        if sl_apps < 4:
-            return True
-        return False
+        return True
 
     mask = df.apply(needs_ext, axis=1)
     todo = df.loc[mask].sort_values("price_m", ascending=False).head(max_fetch)
@@ -679,6 +807,11 @@ def apply_external_priors(
                     "price_m": float(r["price_m"]),
                     "fixture_attack_mult": float(r.get("fixture_attack_mult") or 1.0),
                     "fixture_cs_mult": float(r.get("fixture_cs_mult") or 1.0),
+                    "team_cs_rate": (
+                        float(r.get("team_cs_base"))
+                        if pd.notna(r.get("team_cs_base"))
+                        else None
+                    ),
                     "extras": extras,
                 },
             )
@@ -698,6 +831,7 @@ def apply_external_priors(
             price_m=spec["price_m"],
             fixture_attack_mult=spec["fixture_attack_mult"],
             fixture_cs_mult=spec["fixture_cs_mult"],
+            team_cs_rate=spec["team_cs_rate"],
         )
         return idx, proj
 
@@ -713,9 +847,10 @@ def apply_external_priors(
                 continue
             sl_pts = float(df.at[idx, "projected_pts"] or 0)
             sl_apps = float(df.at[idx, "form_apps"] or 0) + float(df.at[idx, "base_apps"] or 0)
-            if sl_apps >= 8 and sl_pts >= 2.0:
+            sl_minutes = float(df.at[idx, "min_per_app"] or 0) * sl_apps
+            if sl_apps >= 8 and sl_minutes >= 480 and sl_pts >= 2.0:
                 continue
-            if sl_apps >= 4 and sl_pts > 0:
+            if sl_apps >= 4 and sl_minutes >= 240 and sl_pts > 0:
                 blended = 0.55 * sl_pts + 0.45 * proj["projected_pts"]
                 proj["projected_pts"] = round(blended, 3)
                 proj["reason"] = (
