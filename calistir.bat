@@ -12,7 +12,7 @@ echo   (Bu islem 1-3 dakika surebilir)
 echo.
 
 python -m pip install -r requirements.txt -q 2>nul
-python -m src.main
+python -m src.main --report-png data\weekly_report.png
 echo.
 if errorlevel 1 (
   echo Hata olustu. Detay icin: python -m src.main --verbose

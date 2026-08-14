@@ -13,8 +13,9 @@ import pandas as pd
 from .config import BUDGET_M, CACHE_DIR, COOKIE_FILE, DATA_DIR, FORM_MATCHES, PRICES_FILE, is_quiet
 from .fetch_external import apply_external_priors
 from .fetch_fotmob import apply_fotmob_validation
-from .fetch_stats import load_dual_season_stats
+from .fetch_stats import load_dual_season_stats, next_matchweek_fixtures, resolve_season_id
 from .load_prices import load_prices, merge_prices
+from .manager_cards import choose_manager_card, manager_card_advice
 from .names import normalize_name
 from .optimize import optimize_squad
 from .scoring import (
@@ -23,6 +24,7 @@ from .scoring import (
     lookup_fixture_context,
 )
 from .tff_client import fetch_tff_prices, load_saved_login, save_prices_csv
+from .weekly_report import write_weekly_png
 
 ProgressCb = Callable[[str], None]
 
@@ -61,6 +63,7 @@ def run_pipeline(
     cookie_file: str | Path = COOKIE_FILE,
     fetch_prices: bool = True,
     refresh_cache: bool = False,
+    report_png: str | Path | None = None,
     progress: ProgressCb | None = None,
 ) -> dict[str, Any]:
     os.environ.setdefault("FBREF_SSL_VERIFY", "0")
@@ -144,7 +147,11 @@ def run_pipeline(
 
     merged = apply_external_priors(merged, progress=progress)
     _say(progress, "FotMob ikinci kaynak (ilk 11 + güncel kulüp maçları)...")
-    merged = apply_fotmob_validation(merged, progress=progress)
+    merged = apply_fotmob_validation(
+        merged,
+        progress=progress,
+        early_season=bool(meta.get("early_season", meta.get("preseason"))),
+    )
     merged = apply_context_adjustments(merged)
     prices_numeric = pd.to_numeric(merged["price_m"], errors="coerce").replace(0, pd.NA)
     merged["ppm"] = (
@@ -152,9 +159,15 @@ def run_pipeline(
         / prices_numeric
     ).fillna(0.0)
     ext_n = int((merged.get("data_src") == "external_prior").sum()) if "data_src" in merged.columns else 0
+    eligible = merged[
+        merged.get("selection_eligible", pd.Series(True, index=merged.index))
+    ].copy()
+    blocked = int(len(merged) - len(eligible))
+    if eligible.empty:
+        raise RuntimeError("Seçilebilir oyuncu kalmadı; TFF sakat/cezalı durumlarını kontrol et.")
     _say(progress, f"En iyi diziliş + XI + yedek optimize ediliyor ({ext_n} yeni imza)...")
 
-    result = optimize_squad(merged, budget=budget)
+    result = optimize_squad(eligible, budget=budget)
     squad: pd.DataFrame = result["squad"].copy()
     if "display_name" not in squad.columns:
         squad["display_name"] = squad["player"]
@@ -172,6 +185,17 @@ def run_pipeline(
     cap["reason"] = str(cap_row.get("reason") or "")
     cap["data_src"] = str(cap_row.get("data_src") or "")
     result["captain"] = cap
+
+    fixtures: list[dict[str, str]] = []
+    try:
+        fixtures = next_matchweek_fixtures(resolve_season_id(int(meta["requested_start"])))
+    except Exception as exc:  # noqa: BLE001
+        meta.setdefault("notes", []).append(f"Haftalık fikstür alınamadı ({exc}).")
+    cards = manager_card_advice(result, eligible, budget=budget)
+    card_decision = choose_manager_card(cards)
+    report_path = None
+    if report_png:
+        report_path = str(write_weekly_png(report_png, result, card_decision))
 
     leaders = {}
     for pos in ("GK", "DF", "MF", "FW"):
@@ -200,6 +224,10 @@ def run_pipeline(
             "matched_sl": matched,
             "n_prices": len(merged),
             "external_priors": ext_n,
+            "blocked_unavailable": blocked,
+            "fixtures": fixtures,
+            "manager_card": card_decision,
+            "report_png": report_path,
             "formation": result.get("formation", "4-4-2"),
             "bench_shape": result.get("bench_shape") or {},
             "method": (
@@ -232,6 +260,9 @@ def run_pipeline(
         "leaders": leaders,
         "new_signings": _df_records(new_signings, 25),
         "unmatched": _df_records(unmatched, 20),
+        "fixtures": fixtures,
+        "manager_card": card_decision,
+        "report_png": report_path,
         "merged": merged,
         "raw_result": result,
     }
@@ -248,6 +279,7 @@ def run_cli_pipeline(args: Any) -> int:
             form_matches=args.form_matches,
             fetch_prices=not args.no_fetch_prices,
             refresh_cache=args.refresh_cache,
+            report_png=args.report_png,
         )
     except FileNotFoundError:
         print("Fiyat dosyası yok.", file=sys.stderr)
@@ -263,6 +295,8 @@ def run_cli_pipeline(args: Any) -> int:
         payload["merged"].to_csv(args.export_stats, index=False)
         if verbose:
             print(f"İstatistik tablosu: {args.export_stats}")
+    if payload.get("report_png"):
+        print(f"PNG raporu: {payload['report_png']}")
     if args.stats_only:
         print_leaders(payload["merged"], n=args.leaders or 8)
         return 0

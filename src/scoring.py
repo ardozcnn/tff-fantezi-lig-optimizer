@@ -13,7 +13,6 @@ from .config import (
     BCC_TO_ASSIST,
     CONCEDED_PENALTY_PER_2,
     CS_POINTS,
-    FORM_WEAK_APPS,
     GOAL_POINTS,
     KEYPASS_TO_ASSIST,
     MIN_60_POINTS,
@@ -26,10 +25,7 @@ from .config import (
     RED_PENALTY,
     SAVE_POINTS_PER_3,
     SOT_TO_GOAL,
-    W_BASE_DEFAULT,
-    W_BASE_WEAK,
     W_FORM_DEFAULT,
-    W_FORM_WEAK,
     YELLOW_PENALTY,
 )
 from .names import normalize_name
@@ -311,9 +307,10 @@ def expected_points_from_rates(
 
 
 def blend_weights(form_apps: float) -> tuple[float, float]:
-    if form_apps < FORM_WEAK_APPS:
-        return W_FORM_WEAK, W_BASE_WEAK
-    return W_FORM_DEFAULT, W_BASE_DEFAULT
+    """L6 formunu örneklemle büyüt: 1 maç %5, 4 maç %20, 6 maç %30."""
+    apps = max(0.0, min(float(form_apps or 0.0), 6.0))
+    form_weight = W_FORM_DEFAULT * apps / 6.0
+    return form_weight, 1.0 - form_weight
 
 
 def _recency_multiplier(form_apps: float, form_matches: float) -> float:
@@ -339,7 +336,7 @@ def _blend_rate_sets(
     previous: dict[str, float],
     current_apps: float,
     *,
-    prior_matches: float = 5.0,
+    prior_matches: float = 10.0,
 ) -> tuple[dict[str, float], float]:
     """Az mevcut sezon örneğini silmek yerine önceki sezonla küçültür."""
     if current.get("apps", 0) <= 0:
@@ -660,7 +657,9 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     if "projected_pts" not in out.columns:
         return out
     out["raw_pts"] = pd.to_numeric(out["projected_pts"], errors="coerce").fillna(0.0)
-    form_apps = pd.to_numeric(out.get("form_apps", 0), errors="coerce").fillna(0.0)
+    form_apps = pd.to_numeric(
+        out.get("form_apps", pd.Series(0.0, index=out.index)), errors="coerce"
+    ).fillna(0.0)
     pts = out["raw_pts"].copy()
 
     # Sezon başladıktan sonra resmî TFF gerçekleşen puanını düşük ağırlıkla kalibre et.
@@ -678,8 +677,16 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         tff_ppm > 0,
         tff_points / official_apps.where(official_apps > 0, 1.0),
     )
-    official_weight = (official_apps / 30.0).clip(lower=0.0, upper=0.35)
+    # Resmî gerçekleşen puan da küçük örnektir. Yaklaşık 12 maçlık prior ile
+    # bir ilk maç yalnızca ~%9 taşınır; sonuç büyüdükçe en çok %25'e çıkar.
+    # Uzun geçen-sezon özeti Asensio vb. için hâlâ dışlanır.
     leftover_full_season = (tff_minutes >= 900) & (form_apps < 3)
+    official_weight = (official_apps / 30.0).clip(lower=0.0, upper=0.35)
+    early_official = (tff_minutes > 0) & (tff_minutes < 900)
+    official_weight = official_weight.where(
+        ~early_official,
+        (official_apps / (official_apps + 12.0)).clip(lower=0.0, upper=0.25),
+    )
     has_official = (tff_minutes > 0) & ~leftover_full_season
     pts = pts.where(
         ~has_official,
@@ -699,6 +706,16 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
             mults.append(availability_multiplier(st, p))
         pts = pts * pd.Series(mults, index=pts.index)
 
+    unavailable = {"INJURED", "SUSPENDED", "UNAVAILABLE", "OUT"}
+    status = (
+        out["availability"].astype(str).str.strip().str.upper()
+        if "availability" in out.columns
+        else pd.Series("", index=out.index)
+    )
+    # TFF'nin kendi statüsü, haber niteliğindeki üçüncü taraf sakatlık alanından
+    # önceliklidir. Bu oyuncular raporda görünür ama optimize kadroya giremez.
+    out["selection_eligible"] = ~status.isin(unavailable)
+    out["selection_status"] = status.where(status != "", "UNKNOWN")
     out["projected_pts"] = pts.round(3)
 
     def _note(row: pd.Series) -> str:

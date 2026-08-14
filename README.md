@@ -33,6 +33,7 @@ python -m src.main --verbose    rem ayrıntılı log
 python -m src.main --no-fetch-prices   rem kayıtlı prices.csv
 python -m src.main --refresh-cache     rem Sofascore önbelleğini temizle
 python -m src.main --export-stats out.csv   rem tam analiz tablosu
+python -m src.main --report-png data/weekly_report.png  rem kadro/fikstür/kart görseli
 ```
 
 ## Analiz (arka planda)
@@ -47,7 +48,12 @@ python -m src.main --export-stats out.csv   rem tam analiz tablosu
   gelen oyuncuların iki taraftaki dakika başı performansıyla kalibre edilir
 - Sezon başladıktan sonra resmî TFF puanı/BPS alanlarıyla düşük ağırlıklı kalibrasyon
 - Sakat/cezalı oyuncular TFF `availabilityStatus` ile kırpılır
+- `INJURED`, `SUSPENDED`, `OUT` ve `UNAVAILABLE` durumundaki oyuncular kadro
+  optimizasyonundan tamamen çıkarılır; `DOUBTFUL` oyuncular risk katsayısıyla kalır
 - Optimizer en iyi dizilişi seçer; yedekler otomatik değişim için ağırlıklı
+- Her oyuncunun oynayacağı sıradaki rakip, saha dizilişindeki 11, dört yedek ve
+  haftanın tek menajer kartı kararı `data/weekly_report.png` dosyasına yazılır.
+  Fırsat yeterince güçlü değilse kart harcamak yerine “sakla” önerilir
 
 ## Lig dönüşüm kalibrasyonu
 

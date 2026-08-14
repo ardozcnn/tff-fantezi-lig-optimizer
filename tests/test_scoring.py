@@ -3,7 +3,13 @@ import unittest
 import pandas as pd
 
 from calibrate_leagues import is_domestic_league, season_start
-from src.fetch_fotmob import readiness_multiplier
+from src.fetch_fotmob import (
+    hot_form_blend_weight,
+    hot_form_expected_points,
+    readiness_multiplier,
+    _soften_rate,
+)
+from src.manager_cards import choose_manager_card, manager_card_advice
 from src.league_translation import (
     translate_external_rates,
     translate_metric,
@@ -14,6 +20,7 @@ from src.scoring import (
     _empty_rates,
     _recency_multiplier,
     apply_context_adjustments,
+    blend_weights,
     expected_points_from_rates,
     lookup_fixture_context,
     recency_for_projection,
@@ -21,6 +28,103 @@ from src.scoring import (
 
 
 class ScoringTests(unittest.TestCase):
+    def test_manager_cards_score_captain_and_full_bench_uplift(self) -> None:
+        xi = pd.DataFrame(
+            [
+                {"player": "Kaleci", "team": "A", "position": "GK", "price_m": 4.0, "projected_pts": 3.0},
+                {"player": "Defans 1", "team": "B", "position": "DF", "price_m": 4.0, "projected_pts": 3.0},
+                {"player": "Defans 2", "team": "C", "position": "DF", "price_m": 4.0, "projected_pts": 3.0},
+                {"player": "Defans 3", "team": "D", "position": "DF", "price_m": 4.0, "projected_pts": 3.0},
+                {"player": "Defans 4", "team": "E", "position": "DF", "price_m": 4.0, "projected_pts": 3.0},
+                {"player": "Orta 1", "team": "F", "position": "MF", "price_m": 5.0, "projected_pts": 3.0},
+                {"player": "Orta 2", "team": "G", "position": "MF", "price_m": 5.0, "projected_pts": 3.0},
+                {"player": "Orta 3", "team": "H", "position": "MF", "price_m": 5.0, "projected_pts": 3.0},
+                {"player": "Orta 4", "team": "I", "position": "MF", "price_m": 5.0, "projected_pts": 3.0},
+                {"player": "Forvet 1", "team": "J", "position": "FW", "price_m": 6.0, "projected_pts": 3.0},
+                {"player": "Kaptan", "team": "K", "position": "FW", "price_m": 6.0, "projected_pts": 5.0},
+            ]
+        )
+        bench = pd.DataFrame(
+            [
+                {"player": "Yedek 1", "projected_pts": 4.0},
+                {"player": "Yedek 2", "projected_pts": 4.0},
+            ]
+        )
+        pool = pd.concat([xi, bench], ignore_index=True).fillna(
+            {"team": "Y", "position": "MF", "price_m": 4.0}
+        )
+        result = {
+            "xi": xi,
+            "bench": bench,
+            "captain": {"player": "Kaptan", "projected_pts": 5.0},
+            "total_projected": 38.0,
+        }
+        cards = {card["card"]: card for card in manager_card_advice(result, pool, budget=100)}
+
+        self.assertEqual(cards["Tripleks Kaptan"]["extra_pts"], 5.0)
+        self.assertEqual(cards["Dört Dörtlük Kaptan"]["extra_pts"], 10.0)
+        self.assertEqual(cards["Tüm Takım Sahaya"]["extra_pts"], 4.0)
+
+    def test_manager_recommends_only_one_card_or_hold(self) -> None:
+        hold = choose_manager_card(
+            [
+                {"card": "Dört Dörtlük Kaptan", "extra_pts": 10.9, "why": "4x"},
+                {"card": "Tüm Takım Sahaya", "extra_pts": 7.4, "why": "bench"},
+            ]
+        )
+        use = choose_manager_card(
+            [
+                {"card": "Tripleks Kaptan", "extra_pts": 6.4, "why": "3x"},
+                {"card": "Tüm Takım Sahaya", "extra_pts": 7.0, "why": "bench"},
+            ]
+        )
+
+        self.assertFalse(hold["use"])
+        self.assertEqual(hold["card"], "Kart kullanma")
+        self.assertTrue(use["use"])
+        self.assertEqual(use["card"], "Tripleks Kaptan")
+
+    def test_fotmob_hot_form_softens_two_goal_burst(self) -> None:
+        # 2 gol / 1 maç ham 2.0 değil; altı maçlık prior ile küçülür.
+        self.assertAlmostEqual(
+            _soften_rate(2.0, 1.0, 0.40, 6.0),
+            4.4 / 7.0,
+            places=5,
+        )
+        first_week_weight = hot_form_blend_weight(
+            1.0,
+            90.0,
+            early_season=True,
+        )
+        self.assertGreater(first_week_weight, 0.07)
+        self.assertLess(first_week_weight, 0.10)
+        first_form, first_base = blend_weights(1.0)
+        full_form, full_base = blend_weights(6.0)
+        self.assertAlmostEqual(first_form, 0.05)
+        self.assertAlmostEqual(first_base, 0.95)
+        self.assertAlmostEqual(full_form, 0.30)
+        self.assertAlmostEqual(full_base, 0.70)
+
+        hot = hot_form_expected_points(
+            {
+                "fotmob_sl_apps": 1.0,
+                "fotmob_sl_minutes": 90.0,
+                "fotmob_sl_goals": 2.0,
+                "fotmob_sl_assists": 0.0,
+                "fotmob_sl_rating": 9.0,
+            },
+            "FW",
+        )
+        self.assertIsNotNone(hot)
+        assert hot is not None
+        # Tek maç 13 puan değil; yumuşatılmış gelecek maç beklentisi
+        self.assertGreater(hot, 4.0)
+        self.assertLess(hot, 7.0)
+
+        blended = (1.0 - first_week_weight) * 4.97 + first_week_weight * hot
+        self.assertGreater(blended, 4.8)
+        self.assertLess(blended, 5.2)
+
     def test_current_small_sample_is_blended_not_discarded(self) -> None:
         current = _empty_rates()
         current.update({"apps": 7.0, "gls_pa": 2 / 7, "ast_pa": 0.0})
@@ -29,7 +133,7 @@ class ScoringTests(unittest.TestCase):
 
         blended, current_weight = _blend_rate_sets(current, previous, 7.0)
 
-        self.assertAlmostEqual(current_weight, 7 / 12)
+        self.assertAlmostEqual(current_weight, 7 / 17)
         self.assertGreater(blended["gls_pa"], previous["gls_pa"])
         self.assertLess(blended["ast_pa"], previous["ast_pa"])
 
@@ -96,6 +200,44 @@ class ScoringTests(unittest.TestCase):
 
         self.assertGreater(adjusted.loc[0, "projected_pts"], 4.0)
         self.assertEqual(adjusted.loc[1, "projected_pts"], 4.0)
+
+    def test_first_official_match_has_conservative_weight(self) -> None:
+        frame = pd.DataFrame(
+            [
+                {
+                    "projected_pts": 5.0,
+                    "form_apps": 1,
+                    "availability": "AVAILABLE",
+                    "tff_minutes": 90,
+                    "tff_starts": 1,
+                    "tff_points": 13,
+                    "tff_ppm": 13,
+                }
+            ]
+        )
+
+        adjusted = apply_context_adjustments(frame)
+
+        weight = float(adjusted.loc[0, "tff_calibration_weight"])
+        self.assertGreater(weight, 0.08)
+        self.assertLess(weight, 0.10)
+        self.assertLess(float(adjusted.loc[0, "projected_pts"]), 6.0)
+
+    def test_injured_and_suspended_players_are_not_selection_eligible(self) -> None:
+        frame = pd.DataFrame(
+            [
+                {"projected_pts": 5.0, "availability": "AVAILABLE"},
+                {"projected_pts": 5.0, "availability": "INJURED"},
+                {"projected_pts": 5.0, "availability": "SUSPENDED"},
+                {"projected_pts": 5.0, "availability": "DOUBTFUL", "avail_pct": 60},
+            ]
+        )
+
+        adjusted = apply_context_adjustments(frame)
+
+        self.assertEqual(adjusted["selection_eligible"].tolist(), [True, False, False, True])
+        self.assertLess(adjusted.loc[1, "projected_pts"], 5.0)
+        self.assertLess(adjusted.loc[2, "projected_pts"], 5.0)
 
     def test_leftover_full_season_tff_points_are_ignored(self) -> None:
         frame = pd.DataFrame(

@@ -65,6 +65,120 @@ def readiness_multiplier(recent_played: float, recent_minutes: float) -> float:
     return 0.65 + 0.35 * evidence
 
 
+def _is_super_lig(match: dict[str, Any]) -> bool:
+    name = str(match.get("leagueName") or "").casefold()
+    return "super lig" in name or "süper lig" in name or "superlig" in name.replace(" ", "")
+
+
+def _match_played_at(match: dict[str, Any]) -> datetime | None:
+    raw = str(((match.get("matchDate") or {}).get("utcTime")) or "")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _soften_rate(total: float, apps: float, prior_rate: float, prior_apps: float = 6.0) -> float:
+    """Tek maçlık 2 gol gibi gürültüyü sezon prior'una doğru küçültür."""
+    apps = max(0.0, float(apps))
+    return (float(total) + prior_rate * prior_apps) / (apps + prior_apps)
+
+
+def hot_form_blend_weight(
+    sl_apps: float,
+    sl_minutes: float | None = None,
+    *,
+    early_season: bool = False,
+) -> float:
+    """Güncel sonucun ağırlığı; tek 90 dakika yaklaşık %8, dört maç en çok %25."""
+    apps = max(0.0, float(sl_apps))
+    minutes = max(0.0, float(sl_minutes if sl_minutes is not None else apps * 75.0))
+    if apps <= 0 or minutes <= 0:
+        return 0.0
+    # Sonuç (G/A) xG kadar kararlı değildir; yaklaşık 11 tam maçlık prior.
+    prior_minutes = 990.0 if early_season else 810.0
+    return min(0.25, minutes / (minutes + prior_minutes))
+
+
+_PRIOR_GLS = {"FW": 0.40, "MF": 0.15, "DF": 0.06, "GK": 0.0}
+_PRIOR_AST = {"FW": 0.15, "MF": 0.18, "DF": 0.08, "GK": 0.0}
+
+
+def hot_form_expected_points(
+    validation: dict[str, Any],
+    position: str,
+    *,
+    prior_rates: dict[str, float] | None = None,
+    attack_mult: float = 1.0,
+    cs_mult: float = 1.0,
+    team_cs_rate: float | None = None,
+) -> float | None:
+    """Son Süper Lig maçlarından (Bayes yumuşatmalı) bir maçlık beklenen puan."""
+    raw_apps = float(validation.get("fotmob_sl_apps") or 0.0)
+    apps = float(
+        validation.get("fotmob_sl_effective_apps")
+        or raw_apps
+        or 0.0
+    )
+    if raw_apps < 1 or apps <= 0:
+        return None
+    minutes = float(
+        validation.get("fotmob_sl_effective_minutes")
+        or validation.get("fotmob_sl_minutes")
+        or 0.0
+    )
+    goals = float(
+        validation.get("fotmob_sl_effective_goals")
+        if validation.get("fotmob_sl_effective_goals") is not None
+        else validation.get("fotmob_sl_goals")
+        or 0.0
+    )
+    assists = float(
+        validation.get("fotmob_sl_effective_assists")
+        if validation.get("fotmob_sl_effective_assists") is not None
+        else validation.get("fotmob_sl_assists")
+        or 0.0
+    )
+    pos = position if position in _PRIOR_GLS else "MF"
+    prior = prior_rates or {}
+    prior_gls = max(0.0, float(prior.get("gls_pa") or _PRIOR_GLS[pos]))
+    prior_ast = max(0.0, float(prior.get("ast_pa") or _PRIOR_AST[pos]))
+    min_per_app = minutes / apps if apps else 0.0
+    share_60 = 1.0 if min_per_app >= 60 else max(0.0, min_per_app / 60.0)
+    rates = {
+        "apps": apps,
+        "apps_60": apps * share_60,
+        "share_60": share_60,
+        "min_per_app": min_per_app,
+        "gls_pa": _soften_rate(goals, apps, prior_gls),
+        "ast_pa": _soften_rate(assists, apps, prior_ast),
+        # Tek maçta olmayan derin metrikleri oyuncunun uzun dönem prior'ından al.
+        "xg_pa": max(0.0, float(prior.get("xg_pa") or 0.0)),
+        "xa_pa": max(0.0, float(prior.get("xa_pa") or 0.0)),
+        "sot_pa": max(0.0, float(prior.get("sot_pa") or 0.0)),
+        "key_passes_pa": max(0.0, float(prior.get("key_passes_pa") or 0.0)),
+        "bcc_pa": max(0.0, float(prior.get("bcc_pa") or 0.0)),
+        "yc_pa": 0.0,
+        "rc_pa": 0.0,
+        # Tek maç rating'i golü yeniden saymasın; 6.8'e kuvvetli küçült.
+        "rating": 6.8
+        + (float(validation.get("fotmob_sl_rating") or 6.8) - 6.8)
+        * apps
+        / (apps + 8.0),
+    }
+    from .scoring import expected_points_from_rates
+
+    return expected_points_from_rates(
+        rates,
+        pos,
+        team_cs_rate,
+        attack_mult=attack_mult,
+        cs_mult=cs_mult,
+    )
+
+
 def search_player(name: str, team: str) -> dict[str, Any] | None:
     payload = _get_json(
         f"search/suggest?term={quote(name)}",
@@ -146,28 +260,66 @@ def fetch_player_validation(name: str, team: str) -> dict[str, Any] | None:
             continue
     deep = _main_league_deep_stats(payload, player_id)
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=120)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=120)
+    sl_cutoff = now - timedelta(days=28)
 
-    def current_enough(match: dict[str, Any]) -> bool:
-        raw = str(((match.get("matchDate") or {}).get("utcTime")) or "")
-        if not raw:
-            return False
-        try:
-            played_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        except ValueError:
-            return False
-        return played_at >= cutoff
-
-    recent = [
-        match
-        for match in payload.get("recentMatches") or []
-        if _same_team(team, str(match.get("teamName") or "")) and current_enough(match)
-    ][:8]
+    recent = []
+    for match in payload.get("recentMatches") or []:
+        if not _same_team(team, str(match.get("teamName") or "")):
+            continue
+        played_at = _match_played_at(match)
+        if played_at is None or played_at < cutoff:
+            continue
+        recent.append(match)
+        if len(recent) >= 8:
+            break
     played = [m for m in recent if m.get("playedInMatch")]
     starts = [m for m in played if not m.get("onBench")]
     recent_minutes = sum(float(m.get("minutesPlayed") or 0) for m in played)
     recent_goals = sum(float(m.get("goals") or 0) for m in played)
     recent_assists = sum(float(m.get("assists") or 0) for m in played)
+
+    sl_played = []
+    for match in payload.get("recentMatches") or []:
+        if not _same_team(team, str(match.get("teamName") or "")):
+            continue
+        if not _is_super_lig(match) or not match.get("playedInMatch"):
+            continue
+        played_at = _match_played_at(match)
+        if played_at is None or played_at < sl_cutoff:
+            continue
+        sl_played.append(match)
+        if len(sl_played) >= 4:
+            break
+    sl_minutes = sum(float(m.get("minutesPlayed") or 0) for m in sl_played)
+    sl_goals = sum(float(m.get("goals") or 0) for m in sl_played)
+    sl_assists = sum(float(m.get("assists") or 0) for m in sl_played)
+    # Yakın maç daha değerlidir; 42 günlük yarı ömür ilk haftayı neredeyse tam,
+    # eski maçı ise kademeli sayar.
+    weighted = []
+    for match in sl_played:
+        played_at = _match_played_at(match)
+        age_days = max(0.0, (now - played_at).total_seconds() / 86400.0) if played_at else 0.0
+        weight = 0.5 ** (age_days / 42.0)
+        weighted.append((match, weight))
+    sl_effective_apps = sum(weight for _, weight in weighted)
+    sl_effective_minutes = sum(
+        float(match.get("minutesPlayed") or 0) * weight for match, weight in weighted
+    )
+    sl_effective_goals = sum(
+        float(match.get("goals") or 0) * weight for match, weight in weighted
+    )
+    sl_effective_assists = sum(
+        float(match.get("assists") or 0) * weight for match, weight in weighted
+    )
+    sl_ratings = []
+    for m in sl_played:
+        try:
+            sl_ratings.append(float((m.get("ratingProps") or {}).get("rating") or 0))
+        except (TypeError, ValueError):
+            continue
+    sl_rating = sum(sl_ratings) / len(sl_ratings) if sl_ratings else 0.0
 
     return {
         "fotmob_id": player_id,
@@ -193,6 +345,15 @@ def fetch_player_validation(name: str, team: str) -> dict[str, Any] | None:
         "fotmob_recent_minutes": recent_minutes,
         "fotmob_recent_goals": recent_goals,
         "fotmob_recent_assists": recent_assists,
+        "fotmob_sl_apps": float(len(sl_played)),
+        "fotmob_sl_minutes": sl_minutes,
+        "fotmob_sl_goals": sl_goals,
+        "fotmob_sl_assists": sl_assists,
+        "fotmob_sl_rating": sl_rating,
+        "fotmob_sl_effective_apps": sl_effective_apps,
+        "fotmob_sl_effective_minutes": sl_effective_minutes,
+        "fotmob_sl_effective_goals": sl_effective_goals,
+        "fotmob_sl_effective_assists": sl_effective_assists,
         "fotmob_injury": bool(payload.get("injuryInformation")),
     }
 
@@ -202,6 +363,7 @@ def apply_fotmob_validation(
     *,
     progress: ProgressCb = None,
     max_fetch: int = 55,
+    early_season: bool = False,
 ) -> pd.DataFrame:
     """Önemli/az-formlu oyuncuları ikinci kaynaktan doğrular ve güncel kullanım ekler."""
     out = players.copy()
@@ -250,7 +412,74 @@ def apply_fotmob_validation(
                 )
                 out.at[idx, "recency_mult"] = combined
 
+            # Erken sezon / Sofascore form boşken son Süper Lig G/A projeksiyonu taşır.
+            sl_apps = float(validation.get("fotmob_sl_apps") or 0.0)
+            form_n = float(out.at[idx, "form_apps"] or 0.0) if "form_apps" in out.columns else 0.0
+            tff_minutes = (
+                float(out.at[idx, "tff_minutes"] or 0.0)
+                if "tff_minutes" in out.columns and pd.notna(out.at[idx, "tff_minutes"])
+                else 0.0
+            )
+            tff_points = (
+                float(out.at[idx, "tff_points"] or 0.0)
+                if "tff_points" in out.columns and pd.notna(out.at[idx, "tff_points"])
+                else 0.0
+            )
+            has_fresh_tff = 0 < tff_minutes < 400 and tff_points != 0
+            # form_n < 3 tek başına agresif early prior açmaz; maturity bayrağı gerekir.
+            use_hot = sl_apps >= 1 and not has_fresh_tff and (
+                early_season or form_n < 1.5
+            )
+            if use_hot:
+                hot = hot_form_expected_points(
+                    validation,
+                    str(out.at[idx, "position"] or "MF"),
+                    prior_rates={
+                        key: float(out.at[idx, key] or 0.0)
+                        if key in out.columns and pd.notna(out.at[idx, key])
+                        else 0.0
+                        for key in (
+                            "gls_pa",
+                            "ast_pa",
+                            "xg_pa",
+                            "xa_pa",
+                            "sot_pa",
+                            "key_passes_pa",
+                            "bcc_pa",
+                        )
+                    },
+                    attack_mult=float(out.at[idx, "fixture_attack_mult"] or 1.0)
+                    if "fixture_attack_mult" in out.columns
+                    else 1.0,
+                    cs_mult=float(out.at[idx, "fixture_cs_mult"] or 1.0)
+                    if "fixture_cs_mult" in out.columns
+                    else 1.0,
+                    team_cs_rate=(
+                        float(out.at[idx, "team_cs_base"])
+                        if "team_cs_base" in out.columns
+                        and pd.notna(out.at[idx, "team_cs_base"])
+                        else None
+                    ),
+                )
+                effective_minutes = float(
+                    validation.get("fotmob_sl_effective_minutes")
+                    or validation.get("fotmob_sl_minutes")
+                    or 0.0
+                )
+                weight = hot_form_blend_weight(
+                    sl_apps,
+                    effective_minutes,
+                    early_season=early_season,
+                )
+                if hot is not None and weight > 0:
+                    base_pts = float(out.at[idx, "projected_pts"] or 0.0)
+                    blended = (1.0 - weight) * base_pts + weight * float(hot)
+                    out.at[idx, "projected_pts"] = round(blended, 3)
+                    out.at[idx, "fotmob_hot_weight"] = weight
+                    out.at[idx, "fotmob_hot_pts"] = round(float(hot), 3)
+
     if progress:
         count = int(pd.to_numeric(out.get("fotmob_id"), errors="coerce").notna().sum())
-        progress(f"FotMob doğrulaması: {count} oyuncu.")
+        hot_n = int(pd.to_numeric(out.get("fotmob_hot_weight"), errors="coerce").fillna(0).gt(0).sum()) if "fotmob_hot_weight" in out.columns else 0
+        progress(f"FotMob doğrulaması: {count} oyuncu" + (f", {hot_n} hot-form blend." if hot_n else "."))
     return out

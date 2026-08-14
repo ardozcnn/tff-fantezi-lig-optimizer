@@ -23,6 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--refresh-cache", action="store_true")
     p.add_argument("--export-stats", type=str, default=None)
     p.add_argument(
+        "--report-png",
+        type=str,
+        default="data/weekly_report.png",
+        help="Haftalık kadro/fikstür/kart özet PNG dosyası",
+    )
+    p.add_argument(
         "--verbose",
         action="store_true",
         help="Ayrıntılı analiz logu (varsayılan: sade kadro çıktısı)",

@@ -107,8 +107,23 @@ def print_meta(meta: dict[str, Any]) -> None:
         print(f"  Diziliş: {form}  |  yedek {btxt}")
     print(f"  SL eşleşme: {meta.get('matched_sl', '?')}/{meta.get('n_prices', '?')}")
     print(f"  Dış lig önceliği: {meta.get('external_priors', 0)} oyuncu")
+    if meta.get("blocked_unavailable"):
+        print(f"  Sakat/cezalı nedeniyle dışarıda: {meta['blocked_unavailable']}")
     for n in meta.get("notes") or []:
         print(f"  • {n}")
+    fixtures = meta.get("fixtures") or []
+    if fixtures:
+        print("  Yaklaşan fikstür:")
+        for fixture in fixtures:
+            print(
+                f"    {fixture.get('kickoff', '')}  "
+                f"{fixture.get('home', '')} - {fixture.get('away', '')}"
+            )
+    card = meta.get("manager_card") or {}
+    if card:
+        action = "KULLAN" if card.get("use") else "SAKLA"
+        print(f"  Menajer kartı: {action} — {card.get('card')}")
+        print(f"    {card.get('why', '')}")
     print()
 
 

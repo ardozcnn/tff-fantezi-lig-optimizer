@@ -7,6 +7,7 @@ import os
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,22 @@ class SofaNotFound(RuntimeError):
     """Sofascore 404 — sezon/istatistik henüz yok."""
 
 _session = None
+_session_profile = ""
 _last_request = 0.0
+_sofa_blocked = False
+_stale_cache_warned = False
+_IMPERSONATE_PROFILES = (
+    "chrome146",
+    "chrome131",
+    "chrome124",
+    "safari184",
+)
+_SOFA_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
+    "Origin": "https://www.sofascore.com",
+    "Referer": "https://www.sofascore.com/",
+}
 
 
 def _ssl_verify() -> bool:
@@ -40,10 +56,16 @@ def _ssl_verify() -> bool:
     return False
 
 
-def _get_session():
-    global _session
-    if _session is None:
-        _session = curl_requests.Session(impersonate="chrome")
+def _get_session(profile: str | None = None):
+    global _session, _session_profile
+    wanted = profile or _session_profile or _IMPERSONATE_PROFILES[0]
+    if _session is None or wanted != _session_profile:
+        try:
+            _session = curl_requests.Session(impersonate=wanted)
+            _session_profile = wanted
+        except Exception:
+            _session = curl_requests.Session(impersonate="chrome")
+            _session_profile = "chrome"
     return _session
 
 
@@ -62,13 +84,14 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{safe}.json"
 
 
-def _load_cache(key: str, max_age_hours: float = 18.0) -> Any | None:
+def _load_cache(key: str, max_age_hours: float | None = 18.0) -> Any | None:
     path = _cache_path(key)
     if not path.exists():
         return None
-    age_h = (time.time() - path.stat().st_mtime) / 3600
-    if age_h > max_age_hours:
-        return None
+    if max_age_hours is not None:
+        age_h = (time.time() - path.stat().st_mtime) / 3600
+        if age_h > max_age_hours:
+            return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
@@ -80,21 +103,70 @@ def _save_cache(key: str, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
+def _sofa_fetch(url: str, delay: float) -> Any:
+    last_error: Exception | None = None
+    for profile in _IMPERSONATE_PROFILES:
+        _throttle(delay)
+        try:
+            resp = _get_session(profile).get(
+                url,
+                headers=_SOFA_HEADERS,
+                timeout=45,
+                verify=_ssl_verify(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            continue
+        if resp.status_code == 404:
+            raise SofaNotFound(url)
+        if resp.status_code in (403, 429, 503):
+            last_error = RuntimeError(f"Sofascore {resp.status_code}: {url}")
+            continue
+        if resp.status_code != 200:
+            last_error = RuntimeError(f"Sofascore {resp.status_code}: {url}")
+            continue
+        return resp.json()
+    if last_error:
+        raise last_error
+    raise RuntimeError(f"Sofascore istek başarısız: {url}")
+
+
 def sofa_get(path: str, *, cache_key: str | None = None, max_age_hours: float = 18.0, delay: float = 0.35) -> Any:
+    global _sofa_blocked, _stale_cache_warned
     if cache_key:
         cached = _load_cache(cache_key, max_age_hours=max_age_hours)
         if cached is not None:
             return cached
-    _throttle(delay)
     url = path if path.startswith("http") else f"{SOFA_BASE}{path}"
-    resp = _get_session().get(url, timeout=45, verify=_ssl_verify())
-    if resp.status_code == 404:
-        raise SofaNotFound(url)
-    if resp.status_code != 200:
-        raise RuntimeError(f"Sofascore {resp.status_code}: {url}")
-    data = resp.json()
+    if not _sofa_blocked:
+        try:
+            data = _sofa_fetch(url, delay)
+        except SofaNotFound:
+            raise
+        except Exception as exc:
+            if "403" in str(exc) or "429" in str(exc):
+                _sofa_blocked = True
+            data = None
+            fetch_error = exc
+        else:
+            if cache_key:
+                _save_cache(cache_key, data)
+            return data
+    else:
+        data = None
+        fetch_error = RuntimeError(f"Sofascore engelli: {url}")
     if cache_key:
-        _save_cache(cache_key, data)
+        stale = _load_cache(cache_key, max_age_hours=None)
+        if stale is not None:
+            if not _stale_cache_warned:
+                warnings.warn(
+                    "Sofascore geçici olarak engelli; kayıtlı önbellek kullanılıyor.",
+                    stacklevel=2,
+                )
+                _stale_cache_warned = True
+            return stale
+    if data is None:
+        raise fetch_error
     return data
 
 
@@ -115,7 +187,7 @@ def list_seasons() -> list[dict[str, Any]]:
     data = sofa_get(
         f"/unique-tournament/{UNIQUE_TOURNAMENT_ID}/seasons",
         cache_key="sofa_seasons",
-        max_age_hours=72,
+        max_age_hours=24 * 14,
         delay=0.2,
     )
     return list(data.get("seasons") or [])
@@ -197,12 +269,61 @@ def fetch_upcoming_events(season_id: int, max_pages: int = 2) -> list[dict[str, 
     return events
 
 
+def next_matchweek_fixtures(season_id: int) -> list[dict[str, str]]:
+    """Bir kulübün ikinci maçı gelene kadar sıradaki maç haftasını sun."""
+    events = fetch_upcoming_events(season_id)
+    if not events:
+        return []
+    fixtures: list[dict[str, str]] = []
+    seen_teams: set[str] = set()
+    for event in events:
+        stamp = int(event.get("startTimestamp") or 0)
+        if not stamp:
+            continue
+        kickoff = datetime.fromtimestamp(stamp, tz=timezone.utc)
+        home = str((event.get("homeTeam") or {}).get("name") or "")
+        away = str((event.get("awayTeam") or {}).get("name") or "")
+        if not home or not away:
+            continue
+        # Ertelenmiş maçlar farklı güne konabilir. Tarih aralığı yerine aynı
+        # takımın ikinci randevusunu sonraki haftanın başlangıcı kabul ederiz.
+        if normalize_name(home) in seen_teams or normalize_name(away) in seen_teams:
+            break
+        seen_teams.update((normalize_name(home), normalize_name(away)))
+        fixtures.append(
+            {
+                "home": home,
+                "away": away,
+                "kickoff": kickoff.astimezone().strftime("%d.%m %H:%M"),
+            }
+        )
+    return fixtures
+
+
 def build_fixture_context(
     upcoming_season_id: int,
     strength_season_id: int,
+    *,
+    fallback_strength_season_id: int | None = None,
+    prefer_fallback: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """İlk gelecek maç + rakibin sezon hücum/savunma gücü."""
-    rows = fetch_standings_rows(strength_season_id)
+    primary_id = (
+        fallback_strength_season_id
+        if prefer_fallback and fallback_strength_season_id
+        else strength_season_id
+    )
+    rows = fetch_standings_rows(primary_id)
+    # Erken sezonda mevcut standings boş/inceyse önceki sezon güç tablosuna düş.
+    if (
+        not prefer_fallback
+        and fallback_strength_season_id
+        and fallback_strength_season_id != primary_id
+    ):
+        played = sum(float(row.get("matches") or 0) for row in rows)
+        teams = len(rows)
+        if teams == 0 or (teams > 0 and played / teams < 4.0):
+            rows = fetch_standings_rows(fallback_strength_season_id)
     metrics: dict[str, dict[str, float]] = {}
     total_goals = total_matches = 0.0
     for row in rows:
@@ -249,6 +370,14 @@ def build_fixture_context(
         if len(context) >= 18:
             break
     return context
+
+
+def _season_median_apps(df: pd.DataFrame) -> float:
+    if df is None or df.empty or "mp" not in df.columns:
+        return 0.0
+    mp = pd.to_numeric(df["mp"], errors="coerce").fillna(0.0)
+    active = mp[mp > 0]
+    return float(active.median()) if not active.empty else 0.0
 
 
 def _merge_top_players(top: dict[str, list]) -> dict[int, dict[str, Any]]:
@@ -460,7 +589,7 @@ def fetch_season_player_stats(year_start: int | None, *, enrich: bool = True) ->
         except SofaNotFound:
             continue
         except Exception as exc:  # noqa: BLE001
-            if "404" in str(exc):
+            if "404" in str(exc) or _sofa_blocked:
                 continue
             warnings.warn(f"Takım {t.get('name')}: {exc}", stacklevel=2)
             continue
@@ -833,25 +962,47 @@ def load_dual_season_stats(
     _log(f"  Önceki sezon baz: {season_label(prev_start)} ...")
     prev_season = fetch_season_player_stats(prev_start, enrich=True)
 
-    # Form lineups
+    # Form lineups: önce istenen sezon (örn. 26/27), yoksa baz sezon (25/26).
     form_cs: dict[str, float] = {}
     form_df = pd.DataFrame()
-    try:
-        sid = resolve_season_id(current_start)
-        _log(f"  Form L{form_matches}: son maç lineups (season_id={sid})...")
-        form_df, form_cs = aggregate_form_from_lineups(sid, form_matches=form_matches)
-        meta["notes"].append(
-            f"Oyuncu formu: son ~{form_matches} maç lineups (Sofascore); "
-            f"{len(form_df)} oyuncu, {len(form_cs)} takım CS."
-        )
-    except SofaNotFound:
-        meta["notes"].append(
-            f"{season_label(current_start)} form maçları henüz yok; sezon oranları form proxy."
-        )
-        form_df = current_season.copy()
-        form_cs = team_season_clean_sheet_rate_from_df(current_season)
-    except Exception as exc:  # noqa: BLE001
-        meta["notes"].append(f"Form lineups alınamadı ({exc}); mevcut sezon oranları form proxy.")
+    form_season_starts: list[int] = []
+    if requested_start != current_start:
+        form_season_starts.append(requested_start)
+    form_season_starts.append(current_start)
+    form_loaded = False
+    for form_start in form_season_starts:
+        try:
+            sid = resolve_season_id(form_start)
+            _log(
+                f"  Form L{form_matches}: son maç lineups "
+                f"({season_label(form_start)}, season_id={sid})..."
+            )
+            candidate_df, candidate_cs = aggregate_form_from_lineups(
+                sid, form_matches=form_matches
+            )
+            if candidate_df.empty:
+                meta["notes"].append(
+                    f"{season_label(form_start)} form lineups boş."
+                )
+                continue
+            form_df, form_cs = candidate_df, candidate_cs
+            meta["form_season_start"] = form_start
+            meta["notes"].append(
+                f"Oyuncu formu: {season_label(form_start)} son ~{form_matches} maç "
+                f"lineups (Sofascore); {len(form_df)} oyuncu, {len(form_cs)} takım CS."
+            )
+            form_loaded = True
+            break
+        except SofaNotFound:
+            meta["notes"].append(
+                f"{season_label(form_start)} form maçları henüz yok."
+            )
+        except Exception as exc:  # noqa: BLE001
+            meta["notes"].append(
+                f"{season_label(form_start)} form lineups alınamadı ({exc})."
+            )
+    if not form_loaded:
+        meta["notes"].append("Form proxy: mevcut sezon oranları.")
         form_df = current_season.copy()
         form_cs = team_season_clean_sheet_rate_from_df(current_season)
 
@@ -868,15 +1019,37 @@ def load_dual_season_stats(
     meta["current_season_rows"] = len(current_season)
     meta["prev_season_rows"] = len(prev_season)
     meta["form_rows"] = len(form_df)
+    # Lig toplamı eşiği aşsa bile ilk ~3-4 maçlık dönem "erken sezon" sayılır.
+    maturity_apps = _season_median_apps(
+        current_season if not meta["preseason"] else pd.DataFrame()
+    )
+    meta["season_maturity_apps"] = maturity_apps
+    meta["early_season"] = bool(meta["preseason"] or maturity_apps < 4.0)
+    if meta["early_season"] and not meta["preseason"]:
+        meta["notes"].append(
+            f"Erken sezon: mevcut sezon medyan maç ~{maturity_apps:.1f}; "
+            "rakip gücü için önceki sezon standings tercih edilir."
+        )
 
     fixture_context: dict[str, dict[str, Any]] = {}
     try:
         upcoming_sid = resolve_season_id(requested_start)
         strength_sid = resolve_season_id(current_start)
-        fixture_context = build_fixture_context(upcoming_sid, strength_sid)
+        fallback_sid = resolve_season_id(requested_start - 1)
+        fixture_context = build_fixture_context(
+            upcoming_sid,
+            strength_sid,
+            fallback_strength_season_id=fallback_sid,
+            prefer_fallback=bool(meta["early_season"]),
+        )
         if fixture_context:
+            strength_note = (
+                f"önceki sezon güç ({season_label(requested_start - 1)})"
+                if meta["early_season"]
+                else f"mevcut sezon güç ({season_label(current_start)})"
+            )
             meta["notes"].append(
-                f"Haftalık rakip/iç-dış saha: {len(fixture_context)} takım için uygulandı."
+                f"Haftalık rakip/iç-dış saha: {len(fixture_context)} takım; {strength_note}."
             )
     except Exception as exc:  # noqa: BLE001
         meta["notes"].append(f"Fikstür etkisi alınamadı ({exc}); nötr rakip varsayıldı.")
