@@ -94,7 +94,7 @@ def run_pipeline(
             )
             save_prices_csv(pdf, prices_path)
             _say(progress, f"TFF fiyatları: {len(pdf)} oyuncu")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _say(progress, f"TFF fiyat hatası: {exc} — kayıtlı CSV deneniyor.")
             if not prices_path.exists():
                 raise
@@ -189,7 +189,7 @@ def run_pipeline(
     fixtures: list[dict[str, str]] = []
     try:
         fixtures = next_matchweek_fixtures(resolve_season_id(int(meta["requested_start"])))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         meta.setdefault("notes", []).append(f"Haftalık fikstür alınamadı ({exc}).")
     cards = manager_card_advice(result, eligible, budget=budget)
     card_decision = choose_manager_card(cards)
@@ -284,7 +284,7 @@ def run_cli_pipeline(args: Any) -> int:
     except FileNotFoundError:
         print("Fiyat dosyası yok.", file=sys.stderr)
         return 1
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"HATA: {exc}", file=sys.stderr)
         return 1
 

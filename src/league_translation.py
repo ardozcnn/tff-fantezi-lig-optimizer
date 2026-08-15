@@ -342,7 +342,6 @@ def translate_external_rates(
 
     for field, metric in per90_fields.items():
         source_pa = float(rates.get(field) or 0.0)
-        # xG/xA ve vekil alanlarında 0 çoğu eski sezonda "veri yok" demektir.
         optional = metric in {
             "xg_p90",
             "xa_p90",

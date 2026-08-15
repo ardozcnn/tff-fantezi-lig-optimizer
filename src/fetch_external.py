@@ -18,7 +18,6 @@ from .league_translation import (
 from .names import best_match, name_variants, normalize_name
 from .scoring import expected_points_from_rates, map_position, rates_from_totals
 
-# Sofascore uniqueTournament id → lig adı
 DOMESTIC_LEAGUES: dict[int, str] = {
     17: "Premier League",
     8: "LaLiga",
@@ -43,20 +42,20 @@ DOMESTIC_LEAGUES: dict[int, str] = {
     52: "Süper Lig",
 }
 
-EURO_IDS = {7, 679, 17015}  # UCL, UEL, UECL
+EURO_IDS = {7, 679, 17015}
 
 SKIP_TOURNAMENTS = {
-    16,  # World Cup
-    11,  # WC Qual UEFA
-    13,  # WC Qual CAF
-    270,  # AFCON
+    16,
+    11,
+    13,
+    270,
     1848,
-    346,  # Community Shield
-    21,  # EFL Cup
-    19,  # FA Cup
-    10783,  # Nations League
-    133,  # Copa America
-    373,  # Copa do Brasil
+    346,
+    21,
+    19,
+    10783,
+    133,
+    373,
 }
 
 ProgressCb = Callable[[str], None] | None
@@ -176,7 +175,6 @@ def pick_search_hit(
     if not hits:
         return None
     team_n = normalize_name(team_hint)
-    # 1) Aynı kulüp
     if team_n:
         same = [h for h in hits if team_n and normalize_name(h.get("squad") or "") == team_n]
         if not same:
@@ -200,7 +198,6 @@ def pick_search_hit(
     matched, score = best_match(query, names, score_cutoff=82)
     if matched and score >= 82:
         return next(h for h in hits if h["player"] == matched)
-    # İlk isabet zayıfsa alma (yanlış Mohamed Salah)
     return None
 
 
@@ -362,7 +359,6 @@ def choose_prior_season(player_id: int) -> tuple[dict[str, Any], dict[str, Any]]
         prev_gi = _gi_rate(prev_st)
         latest_xg = _xg_rate(latest_st)
         prev_xg = _xg_rate(prev_st)
-        # Düşük sezon (sakatlık / form) → önceki kapasiteyi atma (Salah vb.)
         down = (latest_gi < prev_gi * 0.62 and _apps(prev_st) >= 12) or (
             latest_xg > 0 and prev_xg > 0 and latest_xg < prev_xg * 0.62 and _apps(prev_st) >= 12
         )
@@ -379,7 +375,6 @@ def choose_prior_season(player_id: int) -> tuple[dict[str, Any], dict[str, Any]]
             "season_name": note,
         }
 
-    # Aynı yıl Avrupa kupası: ek hücum kanıtı (düşük ağırlık)
     euro = [
         r
         for r in seasons
@@ -774,8 +769,6 @@ def apply_external_priors(
         sl_minutes = float(r.get("min_per_app") or 0) * sl_apps
         if unmatched:
             return True
-        # Eşleşmiş ve gerçek SL dakikası olan oyuncuyu eski dış lig verisiyle ezme.
-        # 4 cameo (10'ar dk) yeterli örnek sayılmaz; Hajradinović gibi 7x60+ kalır.
         if sl_apps >= 4 and sl_minutes >= 240:
             return False
         return True

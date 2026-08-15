@@ -103,7 +103,6 @@ def _cookie_pairs_from_dump(raw: str) -> dict[str, str]:
 
     pairs: dict[str, str] = {}
 
-    # 1) Klasik başlık: a=b; c=d
     if "\n" not in text and "\t" not in text and ";" in text:
         for part in text.split(";"):
             part = part.strip()
@@ -113,7 +112,6 @@ def _cookie_pairs_from_dump(raw: str) -> dict[str, str]:
             pairs[k.strip()] = v.strip()
         return pairs
 
-    # 2) Application paneli: satır = name <tab> value <tab> domain ...
     for line in text.splitlines():
         line = line.strip()
         if not line or line.lower().startswith("name") and "value" in line.lower():
@@ -125,14 +123,12 @@ def _cookie_pairs_from_dump(raw: str) -> dict[str, str]:
                 continue
             pairs[name] = value
             continue
-        # name=value satırı
         if "=" in line and "://" not in line.split("=", 1)[0]:
             k, v = line.split("=", 1)
             k = k.strip()
             if re.match(r"^[\w.-]+$", k):
                 pairs[k] = v.strip()
 
-    # 3) JWT'ler satır içinde gömülüyse
     for name in ("kc_access_token", "kc_refresh_token"):
         if name in pairs:
             continue
@@ -150,14 +146,12 @@ def _clean_cookie(raw: str | None) -> str | None:
     if not pairs:
         s = " ".join(raw.strip().split())
         return s or None
-    # Analitik çerezleri at, oturum olanları tut
     keep = []
     for k, v in pairs.items():
         if k in TRACKING_COOKIES or k.startswith("_ga"):
             continue
         keep.append(f"{k}={v}")
     if not keep:
-        # hiç oturum yoksa ham bırak (analytics_only yakalasın)
         keep = [f"{k}={v}" for k, v in pairs.items()]
     return "; ".join(keep)
 
@@ -353,7 +347,7 @@ def login(email: str | None = None, password: str | None = None) -> requests.Ses
     )
     try:
         body = r.json()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise RuntimeError(f"TFF login JSON okunamadı ({r.status_code}): {exc}") from exc
     if r.status_code != 200 or not body.get("ok"):
         raise RuntimeError(
@@ -387,7 +381,7 @@ def backend_get(
         raise TFFHttpError(path, r.status_code, r.text)
     try:
         return r.json()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise ValueError(f"JSON değil ({path}): {r.text[:200]}") from exc
 
 
@@ -505,7 +499,6 @@ def _unwrap_list(data: Any) -> list[Any]:
         return data
     if not isinstance(data, dict):
         return []
-    # { status: true, data: [...] } veya nested
     for key in (
         "players",
         "data",
@@ -549,7 +542,6 @@ def _pick(d: dict, *keys: str) -> Any:
     for k in keys:
         if k in d and d[k] is not None and d[k] != "":
             return d[k]
-    # case-insensitive
     lower = {str(k).lower(): v for k, v in d.items()}
     for k in keys:
         if k.lower() in lower and lower[k.lower()] not in (None, ""):
@@ -567,7 +559,6 @@ def _norm_pos(raw: Any) -> str | None:
         return POS_NUM.get(int(s))
     if s in POS_ALIASES:
         return POS_ALIASES[s]
-    # "Goalkeeper" vb.
     if "KEEP" in s or "KALE" in s:
         return "GK"
     if "DEF" in s or "BACK" in s:
@@ -584,7 +575,6 @@ def _norm_price(raw: Any) -> float | None:
         return None
     if isinstance(raw, (int, float)) and not isinstance(raw, bool):
         v = float(raw)
-        # FPL gibi 55 (=5.5) ölçeği
         if v > 30:
             v = v / 10.0
         return v
@@ -645,10 +635,8 @@ def parse_players_payload(data: Any) -> pd.DataFrame:
     for p in items:
         if not isinstance(p, dict):
             continue
-        # nested player object
         src = p
         if "player" in p and isinstance(p["player"], dict):
-            # merge top-level price onto nested if needed
             merged = dict(p["player"])
             for k, v in p.items():
                 if k != "player" and k not in merged:
@@ -698,14 +686,12 @@ def parse_players_payload(data: Any) -> pd.DataFrame:
         )
 
     if not rows:
-        # debug yardım
         sample = str(data)[:400]
         raise ValueError(
             "TFF yanıtından oyuncu/fiyat okunamadı. "
             f"Örnek gövde: {sample}"
         )
     df = pd.DataFrame(rows)
-    # dedupe by name+team keep max price
     df = (
         df.sort_values("price_m", ascending=False)
         .drop_duplicates(subset=["player_name", "team"], keep="first")
@@ -762,14 +748,14 @@ def fetch_tff_prices(
                 data = backend_get(path, session=s, timeout=timeout)
                 attempts.append(f"{path} → 200")
                 payloads.append((path, data))
-                break  # ilk başarılı JSON yeterli
+                break
             except TFFAuthError:
                 raise
             except TFFHttpError as exc:
                 attempts.append(f"{path} → {exc.status}")
                 last_err = exc
                 continue
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 attempts.append(f"{path} → {exc}")
                 last_err = exc
                 continue

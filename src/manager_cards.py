@@ -62,8 +62,6 @@ def manager_card_advice(
         },
     ]
 
-    # Kartın resmi diziliş istisnaları uygulama içinde görünmediği için burada
-    # yalnızca doğrulanabilir 5M bütçe etkisini hesapla.
     try:
         attack_result = optimize_squad(available_players, budget=budget + 5.0)
         normal_total = float(result.get("total_projected") or 0.0)
@@ -78,8 +76,6 @@ def manager_card_advice(
     except Exception:
         pass
 
-    # Limitsiz Bütçe transfer anındaki kadro kurma kartıdır; haftalık sabit
-    # puan bonusu olmadığı için mevcut kadroda sayı uydurulmaz.
     advice.append(
         {
             "card": "Limitsiz Bütçe",

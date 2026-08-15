@@ -67,7 +67,6 @@ def _plausible_match(query: str, candidate: str, score: float) -> bool:
     distinctive = (q_set - COMMON_FIRST) & (c_set - COMMON_FIRST)
     if distinctive:
         return True
-    # soyad benzerliği
     if fuzz.ratio(qt[-1], ct[-1]) >= 86:
         return True
     return False
@@ -135,7 +134,6 @@ def name_variants(name: str) -> list[str]:
         if len(tokens) >= 3:
             add(f"{tokens[0]} {tokens[1]}")
             add(f"{tokens[0]} {tokens[1]} {tokens[-1]}")
-            # "Mohamed Salah Hamed ..." → ilk iki anlamlı token
             add(" ".join(tokens[:2]))
         if len(tokens) >= 4:
             add(" ".join(tokens[:3]))
@@ -193,7 +191,6 @@ def best_match(
         return None, 0.0
 
     mapping = {c: normalize_name(c) for c in candidates}
-    # aynı normalize birden fazla adaya denk gelebilir; ilkini tut
     inv: dict[str, str] = {}
     for orig, norm in mapping.items():
         inv.setdefault(norm, orig)

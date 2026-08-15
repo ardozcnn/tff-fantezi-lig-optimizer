@@ -97,7 +97,6 @@ def hot_form_blend_weight(
     minutes = max(0.0, float(sl_minutes if sl_minutes is not None else apps * 75.0))
     if apps <= 0 or minutes <= 0:
         return 0.0
-    # Sonuç (G/A) xG kadar kararlı değildir; yaklaşık 11 tam maçlık prior.
     prior_minutes = 990.0 if early_season else 810.0
     return min(0.25, minutes / (minutes + prior_minutes))
 
@@ -154,7 +153,6 @@ def hot_form_expected_points(
         "min_per_app": min_per_app,
         "gls_pa": _soften_rate(goals, apps, prior_gls),
         "ast_pa": _soften_rate(assists, apps, prior_ast),
-        # Tek maçta olmayan derin metrikleri oyuncunun uzun dönem prior'ından al.
         "xg_pa": max(0.0, float(prior.get("xg_pa") or 0.0)),
         "xa_pa": max(0.0, float(prior.get("xa_pa") or 0.0)),
         "sot_pa": max(0.0, float(prior.get("sot_pa") or 0.0)),
@@ -162,7 +160,6 @@ def hot_form_expected_points(
         "bcc_pa": max(0.0, float(prior.get("bcc_pa") or 0.0)),
         "yc_pa": 0.0,
         "rc_pa": 0.0,
-        # Tek maç rating'i golü yeniden saymasın; 6.8'e kuvvetli küçült.
         "rating": 6.8
         + (float(validation.get("fotmob_sl_rating") or 6.8) - 6.8)
         * apps
@@ -295,8 +292,6 @@ def fetch_player_validation(name: str, team: str) -> dict[str, Any] | None:
     sl_minutes = sum(float(m.get("minutesPlayed") or 0) for m in sl_played)
     sl_goals = sum(float(m.get("goals") or 0) for m in sl_played)
     sl_assists = sum(float(m.get("assists") or 0) for m in sl_played)
-    # Yakın maç daha değerlidir; 42 günlük yarı ömür ilk haftayı neredeyse tam,
-    # eski maçı ise kademeli sayar.
     weighted = []
     for match in sl_played:
         played_at = _match_played_at(match)
@@ -399,8 +394,6 @@ def apply_fotmob_validation(
                     out[key] = None
                 out.at[idx, key] = value
 
-            # Lig L6 eksik görünse bile güncel hazırlık/Avrupa maçlarında oynuyorsa
-            # eski recency cezasını geri al. Dört güncel kulüp maçı tam teyittir.
             old_recency = float(out.at[idx, "recency_mult"] or 1.0)
             recent_played = float(validation.get("fotmob_recent_played") or 0.0)
             recent_minutes = float(validation.get("fotmob_recent_minutes") or 0.0)
@@ -412,7 +405,6 @@ def apply_fotmob_validation(
                 )
                 out.at[idx, "recency_mult"] = combined
 
-            # Erken sezon / Sofascore form boşken son Süper Lig G/A projeksiyonu taşır.
             sl_apps = float(validation.get("fotmob_sl_apps") or 0.0)
             form_n = float(out.at[idx, "form_apps"] or 0.0) if "form_apps" in out.columns else 0.0
             tff_minutes = (
@@ -426,7 +418,6 @@ def apply_fotmob_validation(
                 else 0.0
             )
             has_fresh_tff = 0 < tff_minutes < 400 and tff_points != 0
-            # form_n < 3 tek başına agresif early prior açmaz; maturity bayrağı gerekir.
             use_hot = sl_apps >= 1 and not has_fresh_tff and (
                 early_season or form_n < 1.5
             )

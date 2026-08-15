@@ -1,87 +1,72 @@
 # TFF Fantezi Lig Takım Öneri Aracı
 
-Süper Lig formu, TFF fiyatları ve dış lig istatistiklerini birleştirerek **100M / 15'li** kadro önerir. Diziliş (4-4-2, 4-5-1, 3-4-3 …), ilk 11, yedekler ve kaptan otomatik seçilir.
+Bu proje, TFF Fantezi Lig için haftalık kadro önerisi hazırlar. Oyuncu fiyatlarını, güncel formu, sezon istatistiklerini ve fikstür zorluğunu birlikte değerlendirir; 100 milyon TL bütçeye uyan 15 kişilik kadroyu seçer. Diziliş, ilk 11, yedekler ve kaptan ayrıca hesaplanır.
 
-## Hızlı başlangıç
+## Kurulum
 
-1. Python 3.10+ yüklü olsun.
-2. TFF hesabını `data/tff_login.txt` dosyasına yaz (örnek: `data/tff_login.example.txt`).
-3. `calistir.bat` çalıştır.
+Python 3.10 veya daha yeni bir sürüm gereklidir. TFF hesap bilgileri, örneği verilen `data/tff_login.txt` dosyasına yazılmalıdır:
+
+```text
+email=senin@mail.com
+password=sifren
+```
+
+Bu dosya GitHub'a gönderilmez. Hesap bilgileri istenirse `TFF_EMAIL` ve `TFF_PASSWORD` ortam değişkenleriyle de verilebilir.
+
+Windows'ta projeyi çalıştırmanın en kısa yolu:
 
 ```bat
 calistir.bat
 ```
 
-Çıktı: diziliş, ilk 11, yedekler, kaptan, maliyet.
-
-## Giriş dosyası
-
-`data/tff_login.txt` (git'e eklenmez):
-
-```
-email=senin@mail.com
-password=sifren
-```
-
-Alternatif: ortam değişkenleri `TFF_EMAIL` ve `TFF_PASSWORD`.
-
-## Komut satırı
+## Kullanım
 
 ```bat
-python -m src.main              rem sade kadro
-python -m src.main --verbose    rem ayrıntılı log
-python -m src.main --no-fetch-prices   rem kayıtlı prices.csv
-python -m src.main --refresh-cache     rem Sofascore önbelleğini temizle
-python -m src.main --export-stats out.csv   rem tam analiz tablosu
-python -m src.main --report-png data/weekly_report.png  rem kadro/fikstür/kart görseli
+python -m src.main
+python -m src.main --verbose
+python -m src.main --no-fetch-prices
+python -m src.main --refresh-cache
+python -m src.main --export-stats out.csv
+python -m src.main --report-png data/weekly_report.png
 ```
 
-## Analiz (arka planda)
+İlk komut yalnızca kadro sonucunu gösterir. Diğer seçeneklerle ayrıntılı kayıt alınabilir, kayıtlı fiyatlar kullanılabilir, Sofascore önbelleği yenilenebilir veya analiz sonucu CSV ve PNG olarak dışarı aktarılabilir.
 
-- TFF resmi puan kuralları: dakika (60+ = 2p), gol/asist, CS, kart, bonus, penaltı
-- Sofascore sezon/form verisi + FotMob ikinci kaynak doğrulaması
-- FotMob ilk 11, xG/xA, şut ve güncel hazırlık/resmî kulüp maçları
-- Mevcut sezon az maçlıysa veri atılmaz; önceki sezonla örnek büyüklüğüne göre karıştırılır
-- Haftanın rakibi, iç/dış saha ve rakibin hücum/savunma gücü
-- Yeni transferler: son 1–2 lig sezonu + hazırlık maçı dakikası (varsa)
-- Dış lig oranları sabit tahminle değil, geçmişte o ligden ilk kez Süper Lig'e
-  gelen oyuncuların iki taraftaki dakika başı performansıyla kalibre edilir
-- Sezon başladıktan sonra resmî TFF puanı/BPS alanlarıyla düşük ağırlıklı kalibrasyon
-- Sakat/cezalı oyuncular TFF `availabilityStatus` ile kırpılır
-- `INJURED`, `SUSPENDED`, `OUT` ve `UNAVAILABLE` durumundaki oyuncular kadro
-  optimizasyonundan tamamen çıkarılır; `DOUBTFUL` oyuncular risk katsayısıyla kalır
-- Optimizer en iyi dizilişi seçer; yedekler otomatik değişim için ağırlıklı
-- Her oyuncunun oynayacağı sıradaki rakip, saha dizilişindeki 11, dört yedek ve
-  haftanın tek menajer kartı kararı `data/weekly_report.png` dosyasına yazılır.
-  Fırsat yeterince güçlü değilse kart harcamak yerine “sakla” önerilir
+## Hesaplama yöntemi
 
-## Lig dönüşüm kalibrasyonu
+Oyuncular TFF'nin resmî puan kurallarına göre değerlendirilir. Dakika, gol, asist, temiz sayfa, yenilen gol, kart, penaltı ve bonus puanları tahmine dâhildir.
 
-`data/league_translation.json`, geçmiş dış lig → Süper Lig geçişlerinden üretilen
-çalışma zamanı modelidir. Yalnızca kaynak ve hedef sezonda en az 450 dakika oynayan,
-Süper Lig'e ilk kez gelen oyuncular kullanılır. Mevki ve metrik ayrı modellenir;
-az örnekli ligler mevki geneline küçültülür. Küçültme miktarı ve model etkisi son
-üç sezon üzerinde ileri-zaman doğrulamasıyla seçilir. Turnuva ID'leri canlı
-Sofascore `tier` metadatasıyla doğrulanır; eksik eski xG/xA alanları sıfır sayılmaz.
-Lig örneği yoksa aynı seviye liglerin (üst uçuş / ikinci kademe) modelleri
-kullanılır. Greenwood gibi yüksek tempolu yıldızlar ortalama transfer eğimine
-çekilmez; kaynak G/A oranına doğru karıştırılır. 10 dakikalık form cameo'su
-sezon üretimini ezmez; geçen sezonun tam TFF puan özeti yeni sezonu çift saymaz.
+Sezon ve son maç verileri Sofascore'dan alınır; FotMob verileri ilk 11 durumu, xG, xA, şut ve güncel kulüp maçları için ikinci kaynak olarak kullanılır. Haftanın rakibi, iç veya dış saha durumu ve rakibin hücum-savunma gücü de tahmini etkiler.
 
-Veriyi yenilemek için:
+Sezonun ilk haftalarında tek bir maçın sonucu gereğinden fazla belirleyici olmaz. Yeni sezon verisi, oynanan maç sayısına göre önceki sezonla dengelenir. Bu yöntem özellikle tek maçlık gol, temiz sayfa ve kaleci performanslarının tahmini yapay biçimde yükseltmesini önler.
+
+Yeni transferlerde son lig sezonları ve mevcutsa hazırlık maçlarındaki dakikalar dikkate alınır. Dış ligden gelen oyuncular için sabit bir katsayı kullanılmaz. Geçmişte Süper Lig'e gelen oyuncuların transfer öncesi ve sonrası dakika başına üretimleriyle lig ve mevki bazında dönüşüm hesaplanır.
+
+Sakat, cezalı veya kadro dışı oyuncular optimizasyona alınmaz. Şüpheli durumdaki oyuncular ise oynama riskine göre daha düşük puanlanır.
+
+## Kadro seçimi
+
+Optimizasyon şu kurallara uyar:
+
+- 100 milyon TL bütçe
+- 2 kaleci, 5 savunmacı, 5 orta saha ve 3 forvet
+- Bir kulüpten en fazla 3 oyuncu
+- Geçerli ilk 11 dizilişlerinden biri
+
+PuLP ile kurulan tamsayı programlama modeli, ilk 11 ve yedek katkısını birlikte değerlendirir. Sonuçta en yüksek beklenen puana sahip yasal kadro, kaptan ve uygun diziliş seçilir.
+
+## Haftalık rapor ve menajer kartları
+
+`data/weekly_report.png` dosyasında ilk 11, yedekler, rakipler, kaptan ve haftanın menajer kartı kararı yer alır. Kartın beklenen getirisi yeterli değilse sistem kartı kullanmak yerine saklamayı önerir.
+
+## Lig dönüşüm verisini yenileme
 
 ```bat
 python calibrate_leagues.py
 ```
 
-## Kadro kuralları
+Bu işlem `data/league_translation.json` dosyasını geçmiş transfer verileriyle yeniden oluşturur.
 
-| Kural | Değer |
-|--------|--------|
-| Bütçe | 100M TL |
-| Kadro | 2 GK, 5 DF, 5 MF, 3 FW |
-| Aynı takım | en fazla 3 |
+## Not
 
-## Uyarı
-
-Bu araç resmî TFF uygulaması değildir; öneri amaçlıdır.
+Bu proje TFF'nin resmî bir ürünü değildir. Üretilen kadrolar istatistiksel tahmindir ve karar desteği amacıyla sunulur.

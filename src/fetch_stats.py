@@ -23,7 +23,7 @@ def _log(msg: str) -> None:
         print(msg)
 
 SOFA_BASE = "https://www.sofascore.com/api/v1"
-UNIQUE_TOURNAMENT_ID = 52  # Trendyol Süper Lig
+UNIQUE_TOURNAMENT_ID = 52
 
 
 class SofaNotFound(RuntimeError):
@@ -50,7 +50,6 @@ _SOFA_HEADERS = {
 
 def _ssl_verify() -> bool:
     flag = os.environ.get("FBREF_SSL_VERIFY", "0").strip().lower()
-    # Sofascore da aynı ortam SSL sorununa düşebiliyor; varsayılan esnek
     if flag in ("1", "true", "yes"):
         return True
     return False
@@ -114,7 +113,7 @@ def _sofa_fetch(url: str, delay: float) -> Any:
                 timeout=45,
                 verify=_ssl_verify(),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             last_error = exc
             continue
         if resp.status_code == 404:
@@ -202,7 +201,6 @@ def resolve_season_id(year_start: int) -> int:
     for s in seasons:
         if s.get("year") == yy:
             return int(s["id"])
-    # fallback: year string contains
     for s in seasons:
         if str(year_start) in str(s.get("name", "")):
             return int(s["id"])
@@ -224,7 +222,6 @@ def fetch_standings_teams(season_id: int) -> list[dict[str, Any]]:
             t = row.get("team") or {}
             if t.get("id"):
                 teams.append({"id": t["id"], "name": t.get("name", "")})
-    # unique
     seen = set()
     out = []
     for t in teams:
@@ -285,8 +282,6 @@ def next_matchweek_fixtures(season_id: int) -> list[dict[str, str]]:
         away = str((event.get("awayTeam") or {}).get("name") or "")
         if not home or not away:
             continue
-        # Ertelenmiş maçlar farklı güne konabilir. Tarih aralığı yerine aynı
-        # takımın ikinci randevusunu sonraki haftanın başlangıcı kabul ederiz.
         if normalize_name(home) in seen_teams or normalize_name(away) in seen_teams:
             break
         seen_teams.update((normalize_name(home), normalize_name(away)))
@@ -314,7 +309,6 @@ def build_fixture_context(
         else strength_season_id
     )
     rows = fetch_standings_rows(primary_id)
-    # Erken sezonda mevcut standings boş/inceyse önceki sezon güç tablosuna düş.
     if (
         not prefer_fallback
         and fallback_strength_season_id
@@ -435,13 +429,11 @@ def _merge_top_players(top: dict[str, list]) -> dict[int, dict[str, Any]]:
                 row["rating"] = float(st["rating"])
             field = mapping.get(cat)
             if field and st.get(cat if cat not in mapping else cat) is not None:
-                # statistics key usually matches category name
                 val = st.get(cat)
                 if val is None and field in st:
                     val = st[field]
                 if val is not None:
                     row[field] = val
-            # direct common keys
             for sk, dk in (
                 ("goals", "gls"),
                 ("assists", "ast"),
@@ -547,7 +539,6 @@ def enrich_with_overall(
         for pid, r in players.items()
         if not r.get("minutes") or (r.get("mp") or 0) > 0
     ]
-    # dakika eksik olanları önceliklendir
     need = [pid for pid in players if not players[pid].get("minutes")]
     if not need:
         need = list(players.keys())
@@ -588,7 +579,7 @@ def fetch_season_player_stats(year_start: int | None, *, enrich: bool = True) ->
             part = fetch_team_season_top(int(t["id"]), season_id)
         except SofaNotFound:
             continue
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if "404" in str(exc) or _sofa_blocked:
                 continue
             warnings.warn(f"Takım {t.get('name')}: {exc}", stacklevel=2)
@@ -597,7 +588,6 @@ def fetch_season_player_stats(year_start: int | None, *, enrich: bool = True) ->
             if pid not in merged:
                 merged[pid] = row
             else:
-                # daha dolu alanları koru
                 for k, v in row.items():
                     if k in ("player", "squad", "pos") and v:
                         merged[pid][k] = v
@@ -605,7 +595,6 @@ def fetch_season_player_stats(year_start: int | None, *, enrich: bool = True) ->
                         if not merged[pid].get(k):
                             merged[pid][k] = v
 
-    # Lig lider tablolarından GK CS/saves tamamla
     try:
         league = fetch_league_top(season_id)
         for pid, row in league.items():
@@ -617,7 +606,7 @@ def fetch_season_player_stats(year_start: int | None, *, enrich: bool = True) ->
                         merged[pid][k] = row[k]
     except SofaNotFound:
         pass
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if "404" not in str(exc):
             warnings.warn(f"Lig top: {exc}", stacklevel=2)
 
@@ -630,7 +619,7 @@ def fetch_season_player_stats(year_start: int | None, *, enrich: bool = True) ->
         mins = float(row.get("minutes") or 0)
         mp = float(row.get("mp") or 0)
         if mins <= 0 and mp > 0:
-            mins = mp * 75.0  # kaba tahmin
+            mins = mp * 75.0
         n90 = mins / 90.0 if mins else mp
         rows.append(
             {
@@ -701,13 +690,11 @@ def fetch_recent_events(season_id: int, max_pages: int = 4) -> list[dict[str, An
         events.extend(batch)
         if not data.get("hasNextPage"):
             break
-    # finished only
     out = []
     for e in events:
         st = (e.get("status") or {}).get("type")
         if st in ("finished", "ended") or e.get("homeScore"):
             out.append(e)
-    # sort by startTimestamp desc if present
     out.sort(key=lambda x: x.get("startTimestamp") or 0, reverse=True)
     return out
 
@@ -752,7 +739,6 @@ def aggregate_form_from_lineups(
     player_agg: dict[int, dict[str, float]] = {}
     player_team_apps: dict[int, int] = {}
 
-    # take more events; filter per team to form_matches
     used_events = 0
     for e in events:
         hid = int((e.get("homeTeam") or {}).get("id") or 0)
@@ -761,7 +747,6 @@ def aggregate_form_from_lineups(
         aname = (e.get("awayTeam") or {}).get("name", "")
         if not hid or not aid:
             continue
-        # her iki takım da form_matches dolduysa atla (yine de biraz fazla çekebiliriz)
         if team_apps.get(hid, 0) >= form_matches and team_apps.get(aid, 0) >= form_matches:
             continue
         if team_apps.get(hid, 0) >= form_matches + 2 and team_apps.get(aid, 0) >= form_matches + 2:
@@ -805,7 +790,6 @@ def aggregate_form_from_lineups(
                     continue
                 pid = int(pid)
                 st = pl.get("statistics") or {}
-                # substitute without stats sometimes empty
                 if not st:
                     continue
                 if pid not in player_meta:
@@ -845,17 +829,14 @@ def aggregate_form_from_lineups(
                 if rat:
                     agg["rating_sum"] += float(rat)
                     agg["rating_n"] += 1
-                # CS: 60+ dk ve takım gol yemediyse
                 if mins >= 60 and conceded == 0:
                     agg["cs"] += 1
                 if mins >= 60:
                     agg["ga"] += conceded
                 used_events += 1
 
-        # yeterince takım dolduysa erken çık
         if teams_enough := sum(1 for v in team_apps.values() if v >= form_matches):
             if teams_enough >= 16 and used_events > 50:
-                # çoğu takım L6 tamam
                 pass
 
     form_cs = {t: (sum(v) / len(v) if v else 0.0) for t, v in team_cs.items()}
@@ -908,14 +889,58 @@ def team_season_clean_sheet_rate_from_df(df: pd.DataFrame) -> dict[str, float]:
     """Sezon oyuncu CS toplamlarından kabaca takım oranı üretme (yedek)."""
     if df.empty or "cs" not in df.columns:
         return {}
-    # GK'ların CS oranını kullan
     gks = df[df["pos"].isin(["GK", "G"])] if "pos" in df.columns else df
     rates: dict[str, float] = {}
     for squad, grp in gks.groupby("squad"):
-        mp = grp["mp"].max() or 1
-        cs = grp["cs"].max()
-        rates[str(squad)] = float(cs) / float(mp) if mp else 0.0
+        mp = float(pd.to_numeric(grp["mp"], errors="coerce").fillna(0).max() or 0)
+        if mp < 1:
+            continue
+        cs = float(pd.to_numeric(grp["cs"], errors="coerce").fillna(0).max() or 0)
+        rates[str(squad)] = cs / mp
     return rates
+
+
+def team_season_apps_from_df(df: pd.DataFrame) -> dict[str, float]:
+    """Takım başına mevcut sezon örneklem büyüklüğü (kaleci mp)."""
+    if df.empty or "mp" not in df.columns:
+        return {}
+    gks = df[df["pos"].isin(["GK", "G"])] if "pos" in df.columns else df
+    apps: dict[str, float] = {}
+    for squad, grp in gks.groupby("squad"):
+        mp = float(pd.to_numeric(grp["mp"], errors="coerce").fillna(0).max() or 0)
+        if mp > 0:
+            apps[str(squad)] = mp
+    return apps
+
+
+def blend_team_cs_rates(
+    current: dict[str, float],
+    previous: dict[str, float],
+    current_apps: dict[str, float] | None = None,
+    *,
+    prior_matches: float = 8.0,
+    league_default: float = 0.28,
+) -> dict[str, float]:
+    """
+    Erken sezon tek maç CS=%100 / oynamayan takım CS=%0 gürültüsünü
+    önceki sezonla küçültür.
+    """
+    current_apps = current_apps or {}
+    teams = set(current) | set(previous) | set(current_apps)
+    out: dict[str, float] = {}
+    for team in teams:
+        n = float(current_apps.get(team) or 0.0)
+        curr = current.get(team)
+        prev = previous.get(team, league_default)
+        if curr is None or n <= 0:
+            out[team] = float(prev)
+            continue
+        if n >= 4:
+            out[team] = float(curr)
+            continue
+        weight = n / (n + prior_matches)
+        out[team] = weight * float(curr) + (1.0 - weight) * float(prev)
+    return out
 
 
 def load_dual_season_stats(
@@ -942,12 +967,10 @@ def load_dual_season_stats(
         "preseason": False,
     }
 
-    # Baz sezonlar
     _log(f"  Sezon baz verisi: {season_label(current_start)} ...")
     current_season = fetch_season_player_stats(current_start, enrich=True)
     mp_sum = float(pd.to_numeric(current_season.get("mp"), errors="coerce").fillna(0).sum()) if not current_season.empty else 0.0
     if current_season.empty or mp_sum < 80:
-        # sezon yeni / veri yok — bir geri
         why = "boş" if current_season.empty else "henüz maç yok"
         meta["notes"].append(
             f"{season_label(current_start)} {why}; {season_label(prev_start)} deneniyor."
@@ -962,14 +985,13 @@ def load_dual_season_stats(
     _log(f"  Önceki sezon baz: {season_label(prev_start)} ...")
     prev_season = fetch_season_player_stats(prev_start, enrich=True)
 
-    # Form lineups: önce istenen sezon (örn. 26/27), yoksa baz sezon (25/26).
     form_cs: dict[str, float] = {}
     form_df = pd.DataFrame()
+    form_by_season: dict[int, tuple[pd.DataFrame, dict[str, float]]] = {}
     form_season_starts: list[int] = []
-    if requested_start != current_start:
-        form_season_starts.append(requested_start)
-    form_season_starts.append(current_start)
-    form_loaded = False
+    for start in (requested_start, current_start, requested_start - 1, prev_start):
+        if start not in form_season_starts:
+            form_season_starts.append(start)
     for form_start in form_season_starts:
         try:
             sid = resolve_season_id(form_start)
@@ -985,23 +1007,49 @@ def load_dual_season_stats(
                     f"{season_label(form_start)} form lineups boş."
                 )
                 continue
-            form_df, form_cs = candidate_df, candidate_cs
-            meta["form_season_start"] = form_start
-            meta["notes"].append(
-                f"Oyuncu formu: {season_label(form_start)} son ~{form_matches} maç "
-                f"lineups (Sofascore); {len(form_df)} oyuncu, {len(form_cs)} takım CS."
-            )
-            form_loaded = True
-            break
+            form_by_season[form_start] = (candidate_df, candidate_cs)
         except SofaNotFound:
             meta["notes"].append(
                 f"{season_label(form_start)} form maçları henüz yok."
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             meta["notes"].append(
                 f"{season_label(form_start)} form lineups alınamadı ({exc})."
             )
-    if not form_loaded:
+
+    primary_start = next((s for s in form_season_starts if s in form_by_season), None)
+    if primary_start is not None:
+        form_df, form_cs = form_by_season[primary_start]
+        meta["form_season_start"] = primary_start
+        meta["notes"].append(
+            f"Oyuncu formu: {season_label(primary_start)} son ~{form_matches} maç "
+            f"lineups (Sofascore); {len(form_df)} oyuncu, {len(form_cs)} takım CS."
+        )
+        fallback_start = next(
+            (s for s in form_season_starts if s != primary_start and s in form_by_season),
+            None,
+        )
+        if fallback_start is not None:
+            fallback_df, fallback_cs = form_by_season[fallback_start]
+            primary_teams = {
+                normalize_name(str(t))
+                for t in form_df.get("squad", pd.Series(dtype=str)).dropna().tolist()
+            }
+            missing_mask = ~fallback_df.get("squad", pd.Series(dtype=str)).map(
+                lambda t: normalize_name(str(t)) in primary_teams
+            )
+            extra = fallback_df.loc[missing_mask]
+            if not extra.empty:
+                form_df = pd.concat([form_df, extra], ignore_index=True)
+                for team, rate in fallback_cs.items():
+                    key = normalize_name(team)
+                    if key and key not in {normalize_name(t) for t in form_cs}:
+                        form_cs[team] = rate
+                meta["notes"].append(
+                    f"Yeni sezonda maçı olmayan takımlar için "
+                    f"{season_label(fallback_start)} form fallback: {len(extra)} oyuncu."
+                )
+    else:
         meta["notes"].append("Form proxy: mevcut sezon oranları.")
         form_df = current_season.copy()
         form_cs = team_season_clean_sheet_rate_from_df(current_season)
@@ -1010,16 +1058,24 @@ def load_dual_season_stats(
         form_df = current_season.copy()
         meta["notes"].append("Form boştu → mevcut sezon proxy.")
 
-    base_cs = team_season_clean_sheet_rate_from_df(current_season)
+    base_cs_current = team_season_clean_sheet_rate_from_df(current_season)
+    base_cs_prev = team_season_clean_sheet_rate_from_df(prev_season)
+    base_cs = blend_team_cs_rates(
+        base_cs_current,
+        base_cs_prev,
+        team_season_apps_from_df(current_season),
+    )
     if not base_cs:
-        base_cs = team_season_clean_sheet_rate_from_df(prev_season)
+        base_cs = base_cs_prev or base_cs_current
+    if meta.get("early_season") or meta.get("preseason"):
+        meta["notes"].append(
+            "Takım CS oranı erken sezonda önceki sezonla küçültüldü "
+            "(tek maçlık %0/%100 gürültüsü engellendi)."
+        )
 
-    # scoring: current arg = form_df, prev = for base selection we need both seasons
-    # returns: current=form for form rates; we also attach season tables via meta
     meta["current_season_rows"] = len(current_season)
     meta["prev_season_rows"] = len(prev_season)
     meta["form_rows"] = len(form_df)
-    # Lig toplamı eşiği aşsa bile ilk ~3-4 maçlık dönem "erken sezon" sayılır.
     maturity_apps = _season_median_apps(
         current_season if not meta["preseason"] else pd.DataFrame()
     )
@@ -1051,12 +1107,8 @@ def load_dual_season_stats(
             meta["notes"].append(
                 f"Haftalık rakip/iç-dış saha: {len(fixture_context)} takım; {strength_note}."
             )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         meta["notes"].append(f"Fikstür etkisi alınamadı ({exc}); nötr rakip varsayıldı.")
-
-    # Stitch: scoring build_player_table expects current=form, prev=base pool
-    # We merge current_season into a "base_preferred" by passing prev_season as prev
-    # and putting current_season rows where form missing — handled in scoring update.
 
     return form_df, prev_season, form_cs, base_cs, {
         **meta,

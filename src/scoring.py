@@ -38,7 +38,6 @@ def map_position(pos: str | float | None) -> str | None:
     if not raw:
         return None
     primary = raw[0].strip()
-    # Sofascore tek harf
     if primary in ("G", "GK"):
         return "GK"
     if primary in ("D", "DF"):
@@ -232,7 +231,6 @@ def expected_points_from_rates(
     if appearance is None:
         min_pa = rates.get("min_per_app") or 0.0
         appearance = 0.94 if min_pa >= 70 else (0.88 if min_pa >= 50 else 0.75)
-    # 60 dk: 1p, 60+'dan fazla: 2p (resmi tablo)
     min_pts = appearance * (
         MIN_60_POINTS + share_60 * (MIN_FULL_POINTS - MIN_60_POINTS)
     )
@@ -249,7 +247,6 @@ def expected_points_from_rates(
         rates.get("xa_pa") or 0.0,
         max(kp_proxy, bcc_proxy),
     )
-    # Bütün olay oranları "oynadığı maç başına"; önce oynama olasılığıyla çarpılır.
     goal_pts = appearance * exp_gls * GOAL_POINTS[pos] * attack_mult
     assist_pts = appearance * exp_ast * ASSIST_POINTS * attack_mult
 
@@ -257,8 +254,6 @@ def expected_points_from_rates(
     cs_rate = max(0.0, min(1.0, cs_rate * cs_mult))
     if pos in ("GK", "DF"):
         cs_pts = appearance * cs_rate * share_60 * CS_POINTS[pos]
-        # Takım CS olasılığı verildiyse aynı savunma tahmininden yenen golü de
-        # Poisson P(0)=e^-lambda ile türet; eski kulübün GA oranıyla çelişmesin.
         if team_cs_rate is not None:
             ga_pa = -math.log(max(0.03, min(0.97, cs_rate)))
         else:
@@ -357,6 +352,42 @@ def _blend_rate_sets(
     return out, weight
 
 
+def _position_prior_rates(position: str) -> dict[str, float]:
+    """Tek maçlık CS/gol gürültüsünü küçültmek için mevki nötr prior."""
+    rates = _empty_rates()
+    rates.update(
+        {
+            "apps": 8.0,
+            "apps_60": 7.0,
+            "share_60": 0.85,
+            "min_per_app": 75.0,
+            "cs_rate": 0.28 if position in ("GK", "DF") else (0.25 if position == "MF" else 0.0),
+            "ga_pa": 1.25 if position in ("GK", "DF") else 0.0,
+            "saves_pa": 3.0 if position == "GK" else 0.0,
+            "gls_pa": {"GK": 0.0, "DF": 0.05, "MF": 0.12, "FW": 0.28}.get(position, 0.1),
+            "ast_pa": {"GK": 0.0, "DF": 0.06, "MF": 0.12, "FW": 0.12}.get(position, 0.08),
+            "rating": 6.8,
+        }
+    )
+    return rates
+
+
+def shrink_small_sample_rates(
+    rates: dict[str, float],
+    position: str,
+    *,
+    prior_matches: float = 8.0,
+) -> tuple[dict[str, float], float]:
+    """1-3 maçlık örneklemi mevki prior'una doğru küçültür."""
+    apps = float(rates.get("apps") or 0.0)
+    if apps <= 0:
+        return rates, 0.0
+    if apps >= 4:
+        return rates, 1.0
+    prior = _position_prior_rates(position)
+    return _blend_rate_sets(rates, prior, apps, prior_matches=prior_matches)
+
+
 def build_player_table(
     current: pd.DataFrame,
     prev: pd.DataFrame,
@@ -421,7 +452,6 @@ def build_player_table(
         if (pos_raw is None or str(pos_raw) in ("", "nan")) and pr is not None:
             pos_raw = pr.get("pos")
         position = map_position(pos_raw)
-        # Sofascore pos already GK/DF/MF/FW
         if not position and pos_raw in ("GK", "DF", "MF", "FW"):
             position = str(pos_raw)
         if not position:
@@ -431,8 +461,6 @@ def build_player_table(
         form_apps = form_rates["apps"]
         form_minutes = float(form_row.get("minutes") or 0) if form_row is not None else 0.0
 
-        # Mevcut sezonu 8 maç altındayken tamamen atmak ciddi hataydı:
-        # 7 maçlık 25/26 Hajradinović yerine 24/25'i kullanıyordu.
         cur_apps = float(cur.get("mp") or 0) if cur is not None else 0.0
         cur_rates = _row_rates(cur) if cur is not None else _empty_rates()
         prev_rates = _row_rates(pr) if pr is not None else _empty_rates()
@@ -442,14 +470,26 @@ def build_player_table(
             )
             base_src = f"current+prev ({season_weight:.0%} current)"
         elif cur_rates.get("apps", 0) > 0:
-            base_rates = cur_rates
-            base_src = "current_season"
+            base_rates, sample_w = shrink_small_sample_rates(cur_rates, position)
+            base_src = (
+                "current_season"
+                if sample_w >= 0.999
+                else f"current_shrunk ({sample_w:.0%} observed)"
+            )
         elif prev_rates.get("apps", 0) > 0:
-            base_rates = prev_rates
-            base_src = "prev_season"
+            base_rates, sample_w = shrink_small_sample_rates(prev_rates, position)
+            base_src = (
+                "prev_season"
+                if sample_w >= 0.999
+                else f"prev_shrunk ({sample_w:.0%} observed)"
+            )
         elif form_row is not None:
-            base_rates = form_rates
-            base_src = "form_only"
+            base_rates, sample_w = shrink_small_sample_rates(form_rates, position)
+            base_src = (
+                "form_only"
+                if sample_w >= 0.999
+                else f"form_shrunk ({sample_w:.0%} observed)"
+            )
         else:
             continue
 
@@ -460,8 +500,6 @@ def build_player_table(
             if (form_rates.get(k) or 0) <= 0 and (base_rates.get(k) or 0) > 0:
                 form_rates[k] = base_rates[k]
 
-        # 10 dk'lık son maç xG'si sezon üretimini şişirmesin; form yalnızca
-        # oynama sinyali olarak kalsın (recency). Hücum/CS sezon bazından gelir.
         form_for_points = form_rates
         form_mpa = float(form_rates.get("min_per_app") or 0.0)
         if (
@@ -503,15 +541,23 @@ def build_player_table(
 
         projected = w_f * form_pts + w_b * base_pts
 
-        # Son L6'da görünmemek yalnızca "form verisi yok" değildir; haftalık
-        # oynama ihtimali için güçlü negatif sinyaldir. Sezon bazı bunu ezmesin.
         recent_matches = max(1.0, float(meta.get("form_matches") or 6))
+        early = bool(meta.get("early_season", meta.get("preseason")))
+        form_from_requested = meta.get("form_season_start") == meta.get("requested_start")
         if cur_rates.get("apps", 0) > 0 and not current.empty:
             recency_mult = recency_for_projection(
                 form_apps,
                 recent_matches,
                 preseason=bool(meta.get("preseason")),
             )
+            projected *= recency_mult
+        elif (
+            early
+            and form_from_requested
+            and form_apps <= 0
+            and not bool(meta.get("preseason"))
+        ):
+            recency_mult = _recency_multiplier(0.0, recent_matches)
             projected *= recency_mult
         else:
             recency_mult = 1.0
@@ -605,7 +651,6 @@ def _lookup_cs(squad: str, cs_map: dict[str, float]) -> float | None:
     for k, v in cs_map.items():
         if normalize_name(k) == n:
             return float(v)
-    # kısmi
     for k, v in cs_map.items():
         nk = normalize_name(k)
         if n in nk or nk in n:
@@ -648,6 +693,67 @@ def availability_multiplier(status: str | None, percent: float | None = None) ->
     return base
 
 
+def apply_goalkeeper_start_probabilities(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aynı takımdaki kalecileri ilk-11 olasılığıyla ayır.
+
+    Bir yedek kalecinin tek eski temiz sayfası, uzun dönem takım birincisini
+    geçmemeli. Önce güncel TFF dakikası, sonra form lineups, son olarak aynı
+    kulüpteki geçmiş dakika kullanılır. Yeterli kanıt yoksa nötr bırakılır.
+    """
+    out = df.copy()
+    if out.empty or not {"team", "position", "projected_pts"}.issubset(out.columns):
+        return out
+
+    out["gk_start_probability"] = 1.0
+    out["gk_start_source"] = ""
+    is_gk = out["position"].astype(str).str.upper().eq("GK")
+    for _, idx in out[is_gk].groupby(out.loc[is_gk, "team"].map(normalize_name)).groups.items():
+        members = list(idx)
+        if len(members) < 2:
+            continue
+
+        group = out.loc[members]
+        tff_minutes = pd.to_numeric(
+            group.get("tff_minutes", pd.Series(0.0, index=members)),
+            errors="coerce",
+        ).fillna(0.0)
+        form_apps = pd.to_numeric(
+            group.get("form_apps", pd.Series(0.0, index=members)),
+            errors="coerce",
+        ).fillna(0.0)
+        base_apps = pd.to_numeric(
+            group.get("base_apps", pd.Series(0.0, index=members)),
+            errors="coerce",
+        ).fillna(0.0)
+        min_per_app = pd.to_numeric(
+            group.get("min_per_app", pd.Series(0.0, index=members)),
+            errors="coerce",
+        ).fillna(0.0)
+
+        if float(tff_minutes.max()) >= 45:
+            evidence, source = tff_minutes, "güncel TFF dakika"
+        elif float(form_apps.max()) >= 1:
+            evidence, source = form_apps * min_per_app.clip(lower=45.0) / 90.0, "son form lineups"
+        elif float(base_apps.max()) >= 8:
+            evidence, source = base_apps * min_per_app.clip(lower=45.0) / 90.0, "geçen sezon dakika"
+        else:
+            continue
+
+        leader = float(evidence.max())
+        if leader <= 0:
+            continue
+        probability = (0.05 + 0.90 * evidence / leader).clip(upper=0.95)
+        out.loc[members, "gk_start_probability"] = probability
+        out.loc[members, "gk_start_source"] = source
+        out.loc[members, "projected_pts"] = (
+            pd.to_numeric(out.loc[members, "projected_pts"], errors="coerce").fillna(0.0)
+            * probability
+        ).round(3)
+
+    return out
+
+
 def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     """
     Yeni imza: son lig G/A + xG/xA (gol/asist kapasitesi korunur).
@@ -662,9 +768,6 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     ).fillna(0.0)
     pts = out["raw_pts"].copy()
 
-    # Sezon başladıktan sonra resmî TFF gerçekleşen puanını düşük ağırlıkla kalibre et.
-    # Geçen sezonun tam TFF özeti, yeni sezonun ilk haftalarında Asensio gibi
-    # oyuncuları çift saymasın.
     zeros = pd.Series(0.0, index=out.index)
     tff_minutes = pd.to_numeric(out.get("tff_minutes", zeros), errors="coerce").fillna(0.0)
     tff_starts = pd.to_numeric(out.get("tff_starts", zeros), errors="coerce").fillna(0.0)
@@ -677,9 +780,6 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         tff_ppm > 0,
         tff_points / official_apps.where(official_apps > 0, 1.0),
     )
-    # Resmî gerçekleşen puan da küçük örnektir. Yaklaşık 12 maçlık prior ile
-    # bir ilk maç yalnızca ~%9 taşınır; sonuç büyüdükçe en çok %25'e çıkar.
-    # Uzun geçen-sezon özeti Asensio vb. için hâlâ dışlanır.
     leftover_full_season = (tff_minutes >= 900) & (form_apps < 3)
     official_weight = (official_apps / 30.0).clip(lower=0.0, upper=0.35)
     early_official = (tff_minutes > 0) & (tff_minutes < 900)
@@ -705,6 +805,9 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
                 p = float(v) if v is not None and pd.notna(v) else None
             mults.append(availability_multiplier(st, p))
         pts = pts * pd.Series(mults, index=pts.index)
+    out["projected_pts"] = pts.round(3)
+    out = apply_goalkeeper_start_probabilities(out)
+    pts = pd.to_numeric(out["projected_pts"], errors="coerce").fillna(0.0)
 
     unavailable = {"INJURED", "SUSPENDED", "UNAVAILABLE", "OUT"}
     status = (
@@ -712,8 +815,6 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         if "availability" in out.columns
         else pd.Series("", index=out.index)
     )
-    # TFF'nin kendi statüsü, haber niteliğindeki üçüncü taraf sakatlık alanından
-    # önceliklidir. Bu oyuncular raporda görünür ama optimize kadroya giremez.
     out["selection_eligible"] = ~status.isin(unavailable)
     out["selection_status"] = status.where(status != "", "UNKNOWN")
     out["projected_pts"] = pts.round(3)
@@ -729,6 +830,12 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         st = str(row.get("availability") or "").upper()
         if st and st not in ("AVAILABLE", "", "NAN"):
             bits.append(f"TFF durum {st}")
+        gk_prob = float(row.get("gk_start_probability") or 1.0)
+        if str(row.get("position") or "").upper() == "GK" and gk_prob < 0.99:
+            bits.append(
+                f"ilk 11 olasılığı ~{gk_prob:.0%} "
+                f"({row.get('gk_start_source') or 'kaleci rotasyonu'})"
+            )
         if bits:
             extra = "; ".join(bits)
             return f"{reason} | {extra}" if reason else extra

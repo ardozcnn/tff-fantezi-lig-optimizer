@@ -189,7 +189,6 @@ def arrival_transfer(
     target_team: str,
     target_start: int,
 ) -> dict[str, Any] | None:
-    # Yaz transferi + kış transferi. Mayıs başı ön anlaşmaları da kapsanır.
     lower = int(datetime(target_start, 5, 1, tzinfo=timezone.utc).timestamp())
     upper = int(datetime(target_start + 1, 3, 15, tzinfo=timezone.utc).timestamp())
     candidates = []
@@ -217,7 +216,6 @@ def _source_for_player(target: dict[str, Any]) -> dict[str, Any] | None:
     if not history:
         return None
 
-    # İlk kez gelenleri kullan: daha önce SL görmüş dönüşlerde adaptasyon etkisi farklıdır.
     prior_sl = [
         meta
         for meta in history
@@ -235,7 +233,6 @@ def _source_for_player(target: dict[str, Any]) -> dict[str, Any] | None:
             continue
         if not is_domestic_league(meta):
             continue
-        # Aynı sezon iki ligde oynadıysa yönü transfer kaydıyla doğrula.
         if source_start == target_start and arrival is None:
             continue
         eligible.append(meta)
@@ -257,8 +254,6 @@ def _source_for_player(target: dict[str, Any]) -> dict[str, Any] | None:
             canonical["minutes"] = minutes
         if minutes < MIN_MINUTES:
             continue
-        # Aynı yıl gerçek varış kanıtı, bir önceki yıldan biraz daha güçlüdür;
-        # asıl seçim yine oynanan dakika üzerinden yapılır.
         recency_bonus = 120.0 if season_start(meta.get("year")) == target_start else 0.0
         score = minutes + recency_bonus
         if best is None or score > best[0]:
@@ -463,7 +458,6 @@ def _metric_frame(samples: pd.DataFrame, position: str, spec: MetricSpec) -> pd.
     frame = frame.replace([np.inf, -np.inf], np.nan).dropna(subset=["x", "y", "weight"])
     if frame.empty:
         return frame
-    # Tek bir aşırı sezon bütün küçük ligi belirlemesin.
     x_cap = float(frame["x"].quantile(0.995))
     y_cap = float(frame["y"].quantile(0.995))
     frame["x"] = frame["x"].clip(lower=0.0, upper=max(x_cap, 1e-6))
@@ -671,8 +665,6 @@ def fit_calibration(samples: list[dict[str, Any]]) -> dict[str, Any]:
             global_positions.setdefault(position, {})[metric] = global_model
             validation[f"{position}:{metric}"] = cv
             for tid, local_model in local_models.items():
-                # CV yerel lig etkisini sıfıra indirdiyse global modeli kopyalayıp
-                # dosyayı şişirme; çalışma zamanı zaten mevki geneline düşer.
                 if float(local_model.get("local_weight") or 0.0) <= 0:
                     continue
                 if spec.hard_cap is not None:
@@ -683,7 +675,6 @@ def fit_calibration(samples: list[dict[str, Any]]) -> dict[str, Any]:
                 )
                 leagues[str(tid)]["positions"].setdefault(position, {})[metric] = local_model
 
-    # Kullanıcıya okunabilir, tek sayılık gözlenen hücum devamlılığı.
     for tid, league in leagues.items():
         subset = frame[
             (frame["source_tournament_id"] == int(tid))

@@ -15,6 +15,7 @@ from src.league_translation import (
     translate_metric,
     translate_metric_mixture,
 )
+from src.fetch_stats import blend_team_cs_rates
 from src.scoring import (
     _blend_rate_sets,
     _empty_rates,
@@ -24,6 +25,7 @@ from src.scoring import (
     expected_points_from_rates,
     lookup_fixture_context,
     recency_for_projection,
+    shrink_small_sample_rates,
 )
 
 
@@ -85,7 +87,6 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(use["card"], "Tripleks Kaptan")
 
     def test_fotmob_hot_form_softens_two_goal_burst(self) -> None:
-        # 2 gol / 1 maç ham 2.0 değil; altı maçlık prior ile küçülür.
         self.assertAlmostEqual(
             _soften_rate(2.0, 1.0, 0.40, 6.0),
             4.4 / 7.0,
@@ -117,7 +118,6 @@ class ScoringTests(unittest.TestCase):
         )
         self.assertIsNotNone(hot)
         assert hot is not None
-        # Tek maç 13 puan değil; yumuşatılmış gelecek maç beklentisi
         self.assertGreater(hot, 4.0)
         self.assertLess(hot, 7.0)
 
@@ -136,6 +136,53 @@ class ScoringTests(unittest.TestCase):
         self.assertAlmostEqual(current_weight, 7 / 17)
         self.assertGreater(blended["gls_pa"], previous["gls_pa"])
         self.assertLess(blended["ast_pa"], previous["ast_pa"])
+
+    def test_single_clean_sheet_is_shrunk_for_goalkeepers(self) -> None:
+        one_match = _empty_rates()
+        one_match.update(
+            {
+                "apps": 1.0,
+                "apps_60": 1.0,
+                "share_60": 1.0,
+                "min_per_app": 90.0,
+                "cs_rate": 1.0,
+                "saves_pa": 1.0,
+                "ga_pa": 0.0,
+                "rating": 7.4,
+            }
+        )
+        shrunk, weight = shrink_small_sample_rates(one_match, "GK")
+        raw = expected_points_from_rates(one_match, "GK", appearance=1.0)
+        tempered = expected_points_from_rates(shrunk, "GK", appearance=1.0)
+
+        self.assertAlmostEqual(weight, 1 / 9)
+        self.assertLess(shrunk["cs_rate"], 0.45)
+        self.assertLess(tempered, raw)
+        self.assertLess(tempered, 5.0)
+
+    def test_early_team_cs_is_blended_not_taken_as_certainty(self) -> None:
+        blended = blend_team_cs_rates(
+            {"Rizespor": 1.0, "Başakşehir": 0.0},
+            {"Rizespor": 0.30, "Başakşehir": 0.36},
+            {"Rizespor": 1.0, "Başakşehir": 0.0},
+        )
+        self.assertGreater(blended["Rizespor"], 0.30)
+        self.assertLess(blended["Rizespor"], 0.45)
+        self.assertAlmostEqual(blended["Başakşehir"], 0.36)
+
+        perfect = expected_points_from_rates(
+            {"apps": 10, "share_60": 1.0, "min_per_app": 90, "saves_pa": 3.0},
+            "GK",
+            team_cs_rate=1.0,
+            appearance=1.0,
+        )
+        tempered = expected_points_from_rates(
+            {"apps": 10, "share_60": 1.0, "min_per_app": 90, "saves_pa": 3.0},
+            "GK",
+            team_cs_rate=blended["Rizespor"],
+            appearance=1.0,
+        )
+        self.assertLess(tempered, perfect - 1.5)
 
     def test_appearance_probability_scales_attacking_returns(self) -> None:
         rates = _empty_rates()
@@ -222,6 +269,41 @@ class ScoringTests(unittest.TestCase):
         self.assertGreater(weight, 0.08)
         self.assertLess(weight, 0.10)
         self.assertLess(float(adjusted.loc[0, "projected_pts"]), 6.0)
+
+    def test_goalkeeper_depth_prevents_single_old_clean_sheet_from_starting(self) -> None:
+        frame = pd.DataFrame(
+            [
+                {
+                    "player": "Takımın Birincisi",
+                    "team": "Başakşehir",
+                    "position": "GK",
+                    "projected_pts": 4.8,
+                    "base_apps": 33,
+                    "min_per_app": 90,
+                    "form_apps": 0,
+                    "availability": "AVAILABLE",
+                },
+                {
+                    "player": "Tek Maçlık Yedek",
+                    "team": "Başakşehir",
+                    "position": "GK",
+                    "projected_pts": 6.4,
+                    "base_apps": 1,
+                    "min_per_app": 90,
+                    "form_apps": 0,
+                    "availability": "AVAILABLE",
+                },
+            ]
+        )
+
+        adjusted = apply_context_adjustments(frame)
+
+        self.assertAlmostEqual(adjusted.loc[0, "gk_start_probability"], 0.95)
+        self.assertLess(adjusted.loc[1, "gk_start_probability"], 0.10)
+        self.assertGreater(
+            adjusted.loc[0, "projected_pts"],
+            adjusted.loc[1, "projected_pts"],
+        )
 
     def test_injured_and_suspended_players_are_not_selection_eligible(self) -> None:
         frame = pd.DataFrame(

@@ -206,7 +206,6 @@ def write_weekly_png(
             fill="#38d39f",
         )
 
-    # Saha: koyu, çizgili ve daha sakin bir yayın grafiği.
     pitch = (38, 160, 946, 822)
     _card(draw, pitch, fill="#0d543f", outline="#39896b", radius=26, width=2)
     px1, py1, px2, py2 = 56, 178, 928, 804
@@ -255,7 +254,6 @@ def write_weekly_png(
                 captain_name=captain_name,
             )
 
-    # Sağ panel: tek net karar ve yedek kulübesi.
     panel_x = 980
     draw.text((panel_x, 164), "HAFTA STRATEJİSİ", fill=white, font=subtitle)
     draw.text((panel_x, 190), "Tek kart kararı · otomatik hesaplanır", fill=muted, font=_font(11))
