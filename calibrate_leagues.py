@@ -630,11 +630,126 @@ def _cross_validate(frame: pd.DataFrame) -> dict[str, float]:
     }
 
 
+def evaluate_leagues_forward(
+    samples: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Lig bazlı ileri-zaman MAE; yerel katsayı yalnız kimlikten iyiyse terfi eder.
+
+    Mevcut ``league_translation.json`` dosyasını değiştirmez; rapor üretir.
+    """
+    frame = pd.DataFrame(samples)
+    report: dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "method": (
+            "Hedef sezonu ileri-zaman ayır; eğitimde sızıntı yok. "
+            "Yerel lig modeli kimlik MAE'den iyi ve globalden kötü değilse terfi."
+        ),
+        "leagues": {},
+        "metrics": {},
+    }
+    if frame.empty:
+        return report
+
+    for metric, spec in METRICS.items():
+        for position in spec.positions:
+            data = _metric_frame(frame, position, spec)
+            if len(data) < 10:
+                continue
+            cv = _cross_validate(data)
+            prior = float(cv["prior_players"])
+            strength = float(cv["strength"])
+            years = sorted(int(y) for y in data["target_season_start"].unique())
+            validation_years = years[-3:] if len(years) >= 5 else years[-1:]
+            key = f"{position}:{metric}"
+            report["metrics"][key] = cv
+
+            for tid, local in data.groupby("source_tournament_id"):
+                identity_errors: list[tuple[float, float]] = []
+                local_errors: list[tuple[float, float]] = []
+                global_errors: list[tuple[float, float]] = []
+                for year in validation_years:
+                    train = data[data["target_season_start"] < year]
+                    valid = local[local["target_season_start"] == year]
+                    if len(train) < 12 or valid.empty:
+                        continue
+                    # Zaman sızıntısı kontrolü: valid yılı train'de yok.
+                    assert int(valid["target_season_start"].min()) >= year
+                    assert int(train["target_season_start"].max()) < year
+                    global_model, locals_ = _fit_family(train, prior, strength)
+                    fitted = locals_.get(int(tid), global_model)
+                    weight = valid["weight"].to_numpy(float)
+                    y = valid["y"].to_numpy(float)
+                    x = valid["x"].to_numpy(float)
+                    local_pred = np.clip(
+                        float(fitted["intercept"]) + float(fitted["slope"]) * x,
+                        0.0,
+                        float(fitted["cap"]),
+                    )
+                    global_pred = np.clip(
+                        float(global_model["intercept"])
+                        + float(global_model["slope"]) * x,
+                        0.0,
+                        float(global_model["cap"]),
+                    )
+                    wsum = float(weight.sum())
+                    identity_errors.append((_weighted_mae(y, x, weight), wsum))
+                    local_errors.append((_weighted_mae(y, local_pred, weight), wsum))
+                    global_errors.append((_weighted_mae(y, global_pred, weight), wsum))
+
+                if not local_errors:
+                    continue
+
+                def _avg(pairs: list[tuple[float, float]]) -> float:
+                    return float(
+                        np.average([e for e, _ in pairs], weights=[w for _, w in pairs])
+                    )
+
+                identity_mae = _avg(identity_errors)
+                local_mae = _avg(local_errors)
+                global_mae = _avg(global_errors)
+                promote = bool(
+                    local_mae + 1e-12 < identity_mae
+                    and local_mae <= global_mae * 1.02
+                )
+                league_name = str(
+                    local["source_league"].mode().iloc[0]
+                    if not local["source_league"].mode().empty
+                    else tid
+                )
+                bucket = report["leagues"].setdefault(
+                    str(int(tid)),
+                    {"name": league_name, "positions": {}},
+                )
+                bucket["positions"].setdefault(position, {})[metric] = {
+                    "identity_mae": identity_mae,
+                    "local_mae": local_mae,
+                    "global_mae": global_mae,
+                    "promote": promote,
+                    "n_valid_rows": int(sum(len(local[local["target_season_start"] == y]) for y in validation_years)),
+                }
+
+    promoted = 0
+    rejected = 0
+    for league in report["leagues"].values():
+        for metrics in (league.get("positions") or {}).values():
+            for row in metrics.values():
+                if row.get("promote"):
+                    promoted += 1
+                else:
+                    rejected += 1
+    report["summary"] = {
+        "promoted_local_metrics": promoted,
+        "rejected_local_metrics": rejected,
+    }
+    return report
+
+
 def fit_calibration(samples: list[dict[str, Any]]) -> dict[str, Any]:
     frame = pd.DataFrame(samples)
     global_positions: dict[str, dict[str, Any]] = {}
     leagues: dict[str, dict[str, Any]] = {}
     validation: dict[str, Any] = {}
+    league_eval = evaluate_leagues_forward(samples)
 
     league_names = (
         frame.groupby("source_tournament_id")["source_league"]
@@ -667,8 +782,18 @@ def fit_calibration(samples: list[dict[str, Any]]) -> dict[str, Any]:
             for tid, local_model in local_models.items():
                 if float(local_model.get("local_weight") or 0.0) <= 0:
                     continue
+                eval_row = (
+                    (league_eval.get("leagues") or {})
+                    .get(str(int(tid)), {})
+                    .get("positions", {})
+                    .get(position, {})
+                    .get(metric)
+                )
+                if not eval_row or not eval_row.get("promote", False):
+                    continue
                 if spec.hard_cap is not None:
                     local_model["cap"] = min(float(local_model["cap"]), spec.hard_cap)
+                local_model["promoted"] = True
                 leagues.setdefault(
                     str(tid),
                     {"name": str(league_names.get(tid, tid)), "n_players": 0, "positions": {}},
@@ -738,6 +863,10 @@ def fit_calibration(samples: list[dict[str, Any]]) -> dict[str, Any]:
                 "Son üç sezon ileri-zaman doğrulaması; küçültme gücü ve kimlik-model "
                 "karışımı MAE ile seçilir."
             ),
+            "league_promotion": (
+                "Yerel lig katsayısı yalnız ileri-zaman MAE kimlik dönüşümünden iyi "
+                "ve globalden kötü değilse yazılır; aksi halde global/tier fallback."
+            ),
             "tournament_identity": (
                 "Turnuva adı ve tier bilgisi canlı Sofascore metadata ile doğrulanır; "
                 "xG/xA bulunmayan eski sezonlar sıfır sayılmaz."
@@ -755,6 +884,7 @@ def fit_calibration(samples: list[dict[str, Any]]) -> dict[str, Any]:
         "global": {"positions": global_positions},
         "leagues": leagues,
         "validation": validation,
+        "league_evaluation": league_eval.get("summary") or {},
     }
 
 
@@ -784,9 +914,19 @@ def main() -> None:
         default=CACHE_DIR / "league_translation_samples.json",
     )
     parser.add_argument("--fit-only", action="store_true")
+    parser.add_argument(
+        "--eval-only",
+        action="store_true",
+        help="Lig bazlı ileri-zaman raporu üret; league_translation.json yazma",
+    )
+    parser.add_argument(
+        "--eval-output",
+        type=Path,
+        default=CACHE_DIR / "league_evaluation.json",
+    )
     args = parser.parse_args()
 
-    if args.fit_only:
+    if args.fit_only or args.eval_only:
         samples = json.loads(args.samples.read_text(encoding="utf-8"))
     else:
         samples = collect_samples(args.start, args.end, workers=args.workers)
@@ -797,6 +937,20 @@ def main() -> None:
         )
     if not samples:
         raise RuntimeError("Kalibrasyon örneklemi boş.")
+
+    if args.eval_only:
+        report = evaluate_leagues_forward(samples)
+        args.eval_output.parent.mkdir(parents=True, exist_ok=True)
+        args.eval_output.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2, default=_json_default),
+            encoding="utf-8",
+        )
+        summary = report.get("summary") or {}
+        print(
+            f"Değerlendirme: {summary.get('promoted_local_metrics', 0)} terfi, "
+            f"{summary.get('rejected_local_metrics', 0)} red → {args.eval_output}"
+        )
+        return
 
     model = fit_calibration(samples)
     args.output.parent.mkdir(parents=True, exist_ok=True)

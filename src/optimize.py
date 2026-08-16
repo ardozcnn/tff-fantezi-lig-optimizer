@@ -23,6 +23,123 @@ def _selection_value(row: pd.Series) -> float:
     return pts * max(0.05, min(1.0, play))
 
 
+def _sort_xi(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.copy()
+    order = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
+    out["_o"] = out["position"].map(order)
+    out["_v"] = out.apply(_selection_value, axis=1)
+    return out.sort_values(["_o", "_v"], ascending=[True, False]).drop(
+        columns=["_o", "_v"], errors="ignore"
+    )
+
+
+def assign_formation(
+    squad_df: pd.DataFrame,
+    formation: dict[str, int],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Sabit 15'li kadroda formasyona göre greedy ilk 11 / yedek ayrımı."""
+    xi_parts: list[pd.DataFrame] = []
+    bench_parts: list[pd.DataFrame] = []
+    for pos, need in formation.items():
+        pool = squad_df[squad_df["position"] == pos].copy()
+        if pool.empty:
+            continue
+        pool["_v"] = pool.apply(_selection_value, axis=1)
+        pool = pool.sort_values("_v", ascending=False).drop(columns=["_v"])
+        xi_parts.append(pool.head(int(need)))
+        bench_parts.append(pool.iloc[int(need) :])
+    xi = _sort_xi(pd.concat(xi_parts, ignore_index=True)) if xi_parts else pd.DataFrame()
+    bench_raw = (
+        pd.concat(bench_parts, ignore_index=True) if bench_parts else pd.DataFrame()
+    )
+    bench = order_bench_for_autosub(bench_raw)
+    return xi, bench
+
+
+def _formation_feasible(squad_df: pd.DataFrame, formation: dict[str, int]) -> bool:
+    for pos, need in formation.items():
+        if int((squad_df["position"] == pos).sum()) < int(need):
+            return False
+    return True
+
+
+def _local_formation_candidates(
+    xi: pd.DataFrame,
+    bench: pd.DataFrame,
+    formation: dict[str, int],
+) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
+    """Aynı formasyon içinde pahalı/yüksek EV yedeği XI ile yer değiştir."""
+    candidates = [(xi.copy(), bench.copy())]
+    if xi.empty or bench.empty:
+        return candidates
+    for b_idx, b_row in bench.iterrows():
+        b_pos = str(b_row.get("position") or "")
+        xi_same = xi[xi["position"] == b_pos]
+        if xi_same.empty:
+            continue
+        weak_idx = xi_same.apply(_selection_value, axis=1).idxmin()
+        if _selection_value(b_row) <= _selection_value(xi.loc[weak_idx]) + 1e-9:
+            continue
+        new_xi = xi.copy()
+        new_bench = bench.copy()
+        new_xi.loc[weak_idx] = b_row
+        new_bench.loc[b_idx] = xi.loc[weak_idx]
+        candidates.append(
+            (_sort_xi(new_xi.reset_index(drop=True)), order_bench_for_autosub(new_bench.reset_index(drop=True)))
+        )
+    return candidates
+
+
+def rescore_formations(
+    squad_df: pd.DataFrame,
+    formations: dict[str, dict[str, int]],
+    *,
+    autosub_draws: int = AUTOSUB_MONTE_CARLO_DRAWS,
+) -> dict[str, Any]:
+    """15'li kadroyu tüm formasyonlarda gerçek autosub EV ile yeniden puanla."""
+    best: dict[str, Any] | None = None
+    comparisons: list[dict[str, Any]] = []
+    clean = squad_df.drop(columns=["team_key", "role"], errors="ignore").copy()
+
+    for name, shape in formations.items():
+        if not _formation_feasible(clean, shape):
+            continue
+        base_xi, base_bench = assign_formation(clean, shape)
+        for xi_df, bn_df in _local_formation_candidates(base_xi, base_bench, shape):
+            autosub = expected_squad_points(xi_df, bn_df, draws=autosub_draws)
+            ev = float(autosub["expected_pts"])
+            comparisons.append(
+                {
+                    "formation": name,
+                    "expected_pts": round(ev, 3),
+                    "xi_expected": round(float(autosub["xi_expected"]), 3),
+                    "bench_expected": round(float(autosub["bench_expected"]), 3),
+                }
+            )
+            payload = {
+                "formation": name,
+                "xi": xi_df.assign(role="XI").reset_index(drop=True),
+                "bench": bn_df.assign(role="yedek").reset_index(drop=True),
+                "autosub": autosub,
+                "expected_pts": ev,
+            }
+            if best is None or ev > float(best["expected_pts"]) + 1e-9:
+                best = payload
+            elif (
+                best is not None
+                and abs(ev - float(best["expected_pts"])) <= 1e-9
+                and name < str(best["formation"])
+            ):
+                best = payload
+
+    if best is None:
+        raise RuntimeError("Formasyon EV yeniden skorlaması başarısız.")
+
+    comparisons.sort(key=lambda row: row["expected_pts"], reverse=True)
+    best["formation_comparisons"] = comparisons[:8]
+    return best
+
+
 def optimize_squad(
     players: pd.DataFrame,
     *,
@@ -36,8 +153,8 @@ def optimize_squad(
 ) -> dict[str, Any]:
     """
     15'li kadro: resmi 2-5-5-3.
-    İlk 11 dizilişi (4-4-2, 4-5-1, 3-5-2, …) içinden beklenen puanı max olanı seçer.
-    Yedek değeri TFF otomatik değişim beklenen puanıyla hesaplanır.
+    ILP lineer vekille aday 15'i seçer; ardından her formasyonu gerçek
+    otomatik-yedek EV ile yeniden puanlar.
     """
     squad = squad or SQUAD
     formations = formations or FORMATIONS
@@ -61,7 +178,6 @@ def optimize_squad(
                 f"{pos} için {need} oyuncu gerekiyor, listede {have} var."
             )
 
-    # Yedek lineer vekili: ortalama XI blank × yedek oynama (~0.18-0.28)
     linear_bench = 0.22 if bench_weight is None else float(bench_weight)
 
     prob = pulp.LpProblem("tff_fantasy_formation", pulp.LpMaximize)
@@ -112,33 +228,23 @@ def optimize_squad(
             f"Optimum kadro bulunamadı ({pulp.LpStatus[status]})."
         )
 
-    chosen = next(
-        (n for n, v in form_vars.items() if v.value() and v.value() > 0.5),
-        "4-4-2",
+    picked_idx = [
+        i
+        for i in idxs
+        if (start[i].value() and start[i].value() > 0.5)
+        or (bench[i].value() and bench[i].value() > 0.5)
+    ]
+    squad_pool = df.loc[picked_idx].copy()
+    refined = rescore_formations(
+        squad_pool,
+        formations,
+        autosub_draws=autosub_draws,
     )
-    xi_idx = [i for i in idxs if start[i].value() and start[i].value() > 0.5]
-    bn_idx = [i for i in idxs if bench[i].value() and bench[i].value() > 0.5]
-    order = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
-
-    def _sort_xi(frame: pd.DataFrame) -> pd.DataFrame:
-        out = frame.copy()
-        out["_o"] = out["position"].map(order)
-        out["_v"] = out.apply(_selection_value, axis=1)
-        return out.sort_values(["_o", "_v"], ascending=[True, False]).drop(
-            columns=["_o", "_v", "team_key"], errors="ignore"
-        )
-
-    xi_df = _sort_xi(df.loc[xi_idx]).assign(role="XI")
-    bn_df = order_bench_for_autosub(df.loc[bn_idx]).assign(role="yedek")
-    if "team_key" in bn_df.columns:
-        bn_df = bn_df.drop(columns=["team_key"], errors="ignore")
+    chosen = str(refined["formation"])
+    xi_df = refined["xi"]
+    bn_df = refined["bench"]
+    autosub = refined["autosub"]
     squad_df = pd.concat([xi_df, bn_df], ignore_index=True)
-
-    autosub = expected_squad_points(
-        xi_df,
-        bn_df,
-        draws=autosub_draws,
-    )
     total_cost = float(squad_df["price_m"].sum())
     captain_row = xi_df.loc[xi_df.apply(_selection_value, axis=1).idxmax()]
     bench_shape = _bench_of(formations[chosen])
@@ -156,6 +262,7 @@ def optimize_squad(
         "xi_projected": float(autosub["xi_expected"]),
         "bench_projected": float(autosub["bench_expected"]),
         "autosub": autosub,
+        "formation_comparisons": refined.get("formation_comparisons") or [],
         "captain": {
             "player": captain_row["player"],
             "display_name": str(captain_row.get("display_name") or captain_row["player"]),

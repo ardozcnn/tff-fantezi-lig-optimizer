@@ -15,6 +15,9 @@ from .config import (
     COUNT_PRIOR_MATCHES,
     COUNT_RATE_KEYS,
     CS_POINTS,
+    ESTABLISHED_SL_APPS,
+    FIXTURE_CS_CEILING,
+    FIXTURE_CS_FLOOR,
     FORM_PRIOR_MATCHES,
     GOAL_POINTS,
     KEYPASS_TO_ASSIST,
@@ -307,6 +310,26 @@ def expected_points_from_rates(
     )
 
 
+def soft_early_form_rates(
+    form_rates: dict[str, float],
+    base_rates: dict[str, float],
+    form_apps: float,
+    prev_apps: float,
+) -> dict[str, float]:
+    """Tek maçlık gol/asist sinyalini güçlü SL geçmişinin üstüne yazma."""
+    apps = float(form_apps or 0.0)
+    prior_sl = float(prev_apps or 0.0)
+    if apps <= 0 or apps >= 4 or prior_sl < ESTABLISHED_SL_APPS:
+        return form_rates
+    out = dict(form_rates)
+    for key in RARE_RATE_KEYS:
+        observed = float(form_rates.get(key) or 0.0)
+        baseline = float(base_rates.get(key) or 0.0)
+        weight = apps / (apps + RARE_PRIOR_MATCHES)
+        out[key] = weight * observed + (1.0 - weight) * baseline
+    return out
+
+
 def blend_weights(form_apps: float) -> tuple[float, float]:
     """L6 formunu örneklemle büyüt: 1 maç ~%20, 4 maç ~%30, 6 maç %30."""
     apps = max(0.0, min(float(form_apps or 0.0), 6.0))
@@ -535,6 +558,10 @@ def build_player_table(
         form_minutes = float(form_row.get("minutes") or 0) if form_row is not None else 0.0
 
         cur_apps = float(cur.get("mp") or 0) if cur is not None else 0.0
+        prev_apps = float(pr.get("mp") or 0) if pr is not None else 0.0
+        # Form ve mevcut sezon aynı açılış maçını iki kez saymasın.
+        current_apps = max(form_apps, cur_apps)
+        established_sl = max(prev_apps, cur_apps if cur_apps >= ESTABLISHED_SL_APPS else 0.0)
         cur_rates = _row_rates(cur) if cur is not None else _empty_rates()
         prev_rates = _row_rates(pr) if pr is not None else _empty_rates()
         if cur_rates.get("apps", 0) > 0 and prev_rates.get("apps", 0) > 0:
@@ -573,7 +600,9 @@ def build_player_table(
             if (form_rates.get(k) or 0) <= 0 and (base_rates.get(k) or 0) > 0:
                 form_rates[k] = base_rates[k]
 
-        form_for_points = form_rates
+        form_for_points = soft_early_form_rates(
+            form_rates, base_rates, form_apps, prev_apps
+        )
         form_mpa = float(form_rates.get("min_per_app") or 0.0)
         if (
             form_mpa < MIN_FORM_MINUTES_FOR_RATES
@@ -590,7 +619,12 @@ def build_player_table(
         team_base_cs = _lookup_cs(squad, base_cs)
         fixture = lookup_fixture_context(squad, fixture_context)
         fixture_attack = float(fixture.get("attack_mult") or 1.0)
-        fixture_cs = float(fixture.get("cs_mult") or 1.0)
+        fixture_cs = float(
+            max(
+                FIXTURE_CS_FLOOR,
+                min(FIXTURE_CS_CEILING, float(fixture.get("cs_mult") or 1.0)),
+            )
+        )
 
         form_pts = expected_points_from_rates(
             form_for_points,
@@ -641,9 +675,19 @@ def build_player_table(
             projected *= 0.35
 
         show_rates = form_for_points if form_for_points.get("min_per_app", 0) >= 45 else base_rates
+        cs_raw = float(
+            team_base_cs
+            if team_base_cs is not None
+            else (team_form_cs if team_form_cs is not None else (base_rates.get("cs_rate") or 0.0))
+        )
+        cs_after_fixture = max(0.0, min(1.0, cs_raw * fixture_cs))
+        saves_pa = float(show_rates.get("saves_pa") or base_rates.get("saves_pa") or 0.0)
+        saves_contrib = (saves_pa / 3.0) * SAVE_POINTS_PER_3 if position == "GK" else 0.0
         reason_bits = []
         if position in ("DF", "GK"):
-            reason_bits.append(f"CS~{(team_form_cs if team_form_cs is not None else form_rates.get('cs_rate', 0)):.0%}")
+            reason_bits.append(f"CS~{cs_after_fixture:.0%} (baz {cs_raw:.0%}, fikstür×{fixture_cs:.2f})")
+            if position == "GK" and saves_pa > 0:
+                reason_bits.append(f"kurtarış ~{saves_pa:.1f}/maç (~{saves_contrib:.2f}p)")
             if form_rates.get("int_p90", 0) > 0:
                 reason_bits.append(f"Int/90={form_rates['int_p90']:.1f}")
         gls_show = show_rates.get("gls_pa") or 0
@@ -663,6 +707,10 @@ def build_player_table(
             reason_bits.append(
                 f"beklenen G/A={exp_g:.2f}/{exp_a:.2f} (ham {gls_show:.2f}/{ast_show:.2f}, xG/xA {xg_show:.2f}/{xa_show:.2f})"
             )
+            if form_apps <= 2 and prev_apps >= ESTABLISHED_SL_APPS:
+                reason_bits.append(
+                    f"açılış G/A yumuşatıldı (prev SL {prev_apps:.0f} maç)"
+                )
         share = show_rates.get("share_60") or base_rates.get("share_60") or 0
         reason_bits.append(f"60+ dk ~{share:.0%} → {1 + share:.1f}p dakika")
         if fixture:
@@ -678,6 +726,9 @@ def build_player_table(
                 "position": position,
                 "pos_raw": pos_raw,
                 "form_apps": form_apps,
+                "current_apps": current_apps,
+                "prev_apps": prev_apps,
+                "established_sl_apps": established_sl,
                 "base_apps": base_rates.get("apps", 0.0),
                 "form_pts": round(form_pts, 3),
                 "base_pts": round(base_pts, 3),
@@ -703,10 +754,18 @@ def build_player_table(
                 ),
                 "team_cs_form": team_form_cs,
                 "team_cs_base": team_base_cs,
+                "cs_raw": round(cs_raw, 4),
+                "cs_after_fixture": round(cs_after_fixture, 4),
+                "saves_contrib": round(saves_contrib, 3),
                 "fixture_opponent": fixture.get("opponent") or "",
                 "fixture_home": fixture.get("home"),
                 "fixture_attack_mult": fixture_attack,
                 "fixture_cs_mult": fixture_cs,
+                "fixture_cs_note": (
+                    f"baz CS {cs_raw:.0%} × {fixture_cs:.2f} → {cs_after_fixture:.0%}"
+                    if position in ("GK", "DF")
+                    else ""
+                ),
                 "recency_mult": recency_mult,
                 "reason": "; ".join(reason_bits),
                 "player_key": key,
@@ -872,6 +931,11 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     play_probs = out.apply(estimate_play_probability, axis=1)
     out["play_probability"] = play_probs.round(3)
     out["projected_pts"] = (out["pts_if_plays"] * out["play_probability"]).round(3)
+    if "position" in out.columns:
+        is_gk = out["position"].astype(str).str.upper().eq("GK")
+        out["gk_play_prob"] = out["play_probability"].where(is_gk, pd.NA)
+    else:
+        out["gk_play_prob"] = pd.NA
 
     unavailable = {"INJURED", "SUSPENDED", "UNAVAILABLE", "OUT"}
     status = (
@@ -893,14 +957,21 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         st = str(row.get("availability") or "").upper()
         if st and st not in ("AVAILABLE", "", "NAN"):
             bits.append(f"TFF durum {st}")
-        gk_prob = float(row.get("gk_start_probability") or 1.0)
-        if str(row.get("position") or "").upper() == "GK" and gk_prob < 0.99:
-            bits.append(
-                f"ilk 11 olasılığı ~{gk_prob:.0%} "
-                f"({row.get('gk_start_source') or 'kaleci rotasyonu'})"
-            )
+        if str(row.get("position") or "").upper() == "GK":
+            gk_prob = float(row.get("gk_start_probability") or row.get("gk_play_prob") or 1.0)
+            if gk_prob < 0.99:
+                bits.append(
+                    f"ilk 11 olasılığı ~{gk_prob:.0%} "
+                    f"({row.get('gk_start_source') or 'kaleci rotasyonu'})"
+                )
+            note = str(row.get("fixture_cs_note") or "")
+            if note:
+                bits.append(note)
+            saves = float(row.get("saves_contrib") or 0)
+            if saves > 0:
+                bits.append(f"kurtarış katkısı ~{saves:.2f}p")
         play_p = float(row.get("play_probability") or 1.0)
-        if play_p < 0.95:
+        if play_p < 0.95 and str(row.get("position") or "").upper() != "GK":
             bits.append(f"oynama ~{play_p:.0%}")
         if bits:
             extra = "; ".join(bits)

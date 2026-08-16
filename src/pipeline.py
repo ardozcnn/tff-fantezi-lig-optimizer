@@ -15,7 +15,7 @@ from .fetch_external import apply_external_priors
 from .fetch_fotmob import apply_fotmob_validation
 from .fetch_stats import load_dual_season_stats, next_matchweek_fixtures, resolve_season_id
 from .load_prices import load_prices, merge_prices
-from .manager_cards import choose_manager_card, manager_card_advice
+from .manager_cards import choose_manager_card, load_card_state, manager_card_advice
 from .names import normalize_name
 from .optimize import optimize_squad
 from .scoring import (
@@ -192,7 +192,14 @@ def run_pipeline(
     except Exception as exc:
         meta.setdefault("notes", []).append(f"Haftalık fikstür alınamadı ({exc}).")
     cards = manager_card_advice(result, eligible, budget=budget)
-    card_decision = choose_manager_card(cards)
+    card_state = load_card_state(season=int(meta.get("requested_start") or 0) or None)
+    card_decision = choose_manager_card(cards, card_state=card_state)
+    card_decision["card_state"] = {
+        "remaining": card_state.get("remaining"),
+        "budget": card_state.get("budget"),
+        "weeks_left": card_state.get("weeks_left"),
+        "season": card_state.get("season"),
+    }
     report_path = None
     if report_png:
         report_path = str(write_weekly_png(report_png, result, card_decision))

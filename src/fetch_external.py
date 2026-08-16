@@ -17,7 +17,7 @@ from .league_translation import (
 )
 from .names import best_match, name_variants, normalize_name
 from .scoring import expected_points_from_rates, map_position, rates_from_totals
-from .config import EXTERNAL_OPENER_PRIOR_MATCHES
+from .config import ESTABLISHED_SL_APPS, EXTERNAL_OPENER_PRIOR_MATCHES
 
 DOMESTIC_LEAGUES: dict[int, str] = {
     17: "Premier League",
@@ -756,6 +756,9 @@ def apply_external_priors(
         "rating",
         "form_apps",
         "base_apps",
+        "current_apps",
+        "prev_apps",
+        "established_sl_apps",
         "friendly_minutes",
     ):
         if col not in df.columns:
@@ -765,9 +768,22 @@ def apply_external_priors(
         price = float(r.get("price_m") or 0)
         if price < min_price:
             return False
+        prev_apps = float(r.get("prev_apps") or 0)
+        if prev_apps >= ESTABLISHED_SL_APPS:
+            return False
         unmatched = pd.isna(r.get("stats_player")) or not str(r.get("stats_player") or "").strip()
-        sl_apps = float(r.get("form_apps") or 0) + float(r.get("base_apps") or 0)
-        sl_minutes = float(r.get("min_per_app") or 0) * sl_apps
+        current_apps = max(
+            float(r.get("form_apps") or 0),
+            float(r.get("current_apps") or 0),
+        )
+        sl_apps = prev_apps + current_apps
+        sl_minutes = float(r.get("min_per_app") or 0) * max(prev_apps, current_apps, 1.0)
+        if prev_apps >= 4:
+            return False
+        if unmatched and prev_apps <= 0:
+            return True
+        if current_apps >= 4 and sl_minutes >= 240:
+            return False
         if unmatched:
             return True
         if sl_apps >= 4 and sl_minutes >= 240:
@@ -839,14 +855,22 @@ def apply_external_priors(
                 progress(f"Dış lig: {done}/{len(jobs)}...")
             if not proj:
                 continue
+            prev_apps = float(df.at[idx, "prev_apps"] or 0) if "prev_apps" in df.columns else 0.0
+            if prev_apps >= ESTABLISHED_SL_APPS:
+                continue
+            current_apps = max(
+                float(df.at[idx, "form_apps"] or 0),
+                float(df.at[idx, "current_apps"] or 0) if "current_apps" in df.columns else 0.0,
+            )
             sl_pts = float(df.at[idx, "projected_pts"] or 0)
-            sl_apps = float(df.at[idx, "form_apps"] or 0) + float(df.at[idx, "base_apps"] or 0)
+            sl_apps = prev_apps + current_apps
             tff_minutes = float(df.at[idx, "tff_minutes"] or 0) if "tff_minutes" in df.columns else 0.0
-            sl_minutes = float(df.at[idx, "min_per_app"] or 0) * sl_apps
+            sl_minutes = float(df.at[idx, "min_per_app"] or 0) * max(prev_apps, current_apps, 1.0)
             if tff_minutes > 0:
                 sl_minutes = max(sl_minutes, tff_minutes)
-                sl_apps = max(sl_apps, tff_minutes / 75.0)
-            if sl_apps >= 8 and sl_minutes >= 480 and sl_pts >= 2.0:
+                current_apps = max(current_apps, tff_minutes / 75.0)
+                sl_apps = prev_apps + current_apps
+            if prev_apps >= 4 or (sl_apps >= 8 and sl_minutes >= 480 and sl_pts >= 2.0):
                 continue
 
             preserve = {
@@ -854,6 +878,9 @@ def apply_external_priors(
                 for field in (
                     "form_apps",
                     "base_apps",
+                    "current_apps",
+                    "prev_apps",
+                    "established_sl_apps",
                     "min_per_app",
                     "gls_pa",
                     "ast_pa",
@@ -868,12 +895,17 @@ def apply_external_priors(
                     "base_pts",
                     "base_src",
                     "stats_player",
+                    "cs_raw",
+                    "cs_after_fixture",
+                    "saves_contrib",
+                    "gk_play_prob",
+                    "fixture_cs_note",
                 )
                 if field in df.columns and pd.notna(df.at[idx, field]) and str(df.at[idx, field]) not in ("", "nan")
             }
-            had_sl = sl_apps >= 1 and sl_pts > 0
+            had_sl = (prev_apps >= 1 or current_apps >= 1) and sl_pts > 0
 
-            if sl_apps >= 4 and sl_minutes >= 240 and sl_pts > 0:
+            if prev_apps >= 4 or (current_apps >= 4 and sl_minutes >= 240 and sl_pts > 0):
                 blended = 0.55 * sl_pts + 0.45 * proj["projected_pts"]
                 proj["projected_pts"] = round(blended, 3)
                 proj["reason"] = (
@@ -883,12 +915,14 @@ def apply_external_priors(
             elif had_sl:
                 opener_w = min(
                     0.45,
-                    sl_apps / (sl_apps + EXTERNAL_OPENER_PRIOR_MATCHES),
+                    current_apps / (current_apps + EXTERNAL_OPENER_PRIOR_MATCHES)
+                    if current_apps > 0
+                    else 0.0,
                 )
                 blended = (1.0 - opener_w) * float(proj["projected_pts"]) + opener_w * sl_pts
                 proj["projected_pts"] = round(blended, 3)
                 proj["reason"] = (
-                    f"SL açılış {sl_apps:.0f} maç ({opener_w:.0%} ağırlık) + {proj['reason']}"
+                    f"SL açılış {current_apps:.0f} maç ({opener_w:.0%} ağırlık) + {proj['reason']}"
                 )
                 proj["data_src"] = "external_blend"
 

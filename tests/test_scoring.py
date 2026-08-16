@@ -767,6 +767,285 @@ class ScoringTests(unittest.TestCase):
         )
         self.assertGreater(covered["expected_pts"], uncovered["expected_pts"])
 
+    def test_merge_prices_preserves_established_super_lig_apps(self) -> None:
+        from src.load_prices import merge_prices
+
+        stats = pd.DataFrame(
+            [
+                {
+                    "player": "Muhammed Şengezer",
+                    "team": "Başakşehir",
+                    "position": "GK",
+                    "projected_pts": 4.0,
+                    "form_apps": 1.0,
+                    "base_apps": 1.0,
+                    "current_apps": 1.0,
+                    "prev_apps": 33.0,
+                    "established_sl_apps": 33.0,
+                    "data_src": "super_lig",
+                    "reason": "CS",
+                    "min_per_app": 90.0,
+                    "cs_raw": 0.43,
+                    "cs_after_fixture": 0.37,
+                    "fixture_cs_mult": 0.85,
+                }
+            ]
+        )
+        prices = pd.DataFrame(
+            [
+                {
+                    "player_name": "Muhammed Şengezer",
+                    "display_name": "Muhammed Şengezer",
+                    "team": "Başakşehir",
+                    "position": "GK",
+                    "price_m": 4.5,
+                }
+            ]
+        )
+        merged = merge_prices(stats, prices)
+        self.assertEqual(float(merged.iloc[0]["prev_apps"]), 33.0)
+        self.assertEqual(float(merged.iloc[0]["established_sl_apps"]), 33.0)
+        self.assertAlmostEqual(float(merged.iloc[0]["cs_raw"]), 0.43)
+
+    def test_established_super_lig_history_skips_external_prior(self) -> None:
+        from src.fetch_external import apply_external_priors
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "player": "Şengezer",
+                    "team": "Başakşehir",
+                    "position": "GK",
+                    "price_m": 4.5,
+                    "projected_pts": 4.2,
+                    "stats_player": "Muhammed Şengezer",
+                    "form_apps": 1.0,
+                    "current_apps": 1.0,
+                    "prev_apps": 33.0,
+                    "established_sl_apps": 33.0,
+                    "base_apps": 1.0,
+                    "min_per_app": 90.0,
+                    "data_src": "super_lig",
+                },
+                {
+                    "player": "Yeni Kaleci",
+                    "team": "X",
+                    "position": "GK",
+                    "price_m": 5.0,
+                    "projected_pts": 0.0,
+                    "stats_player": "",
+                    "form_apps": 0.0,
+                    "current_apps": 0.0,
+                    "prev_apps": 0.0,
+                    "established_sl_apps": 0.0,
+                    "base_apps": 0.0,
+                    "min_per_app": 0.0,
+                    "data_src": "",
+                },
+            ]
+        )
+        out = apply_external_priors(frame, max_fetch=0)
+        self.assertEqual(out.loc[0, "data_src"], "super_lig")
+        self.assertEqual(float(out.loc[0, "prev_apps"]), 33.0)
+
+    def test_soft_early_form_keeps_strong_super_lig_base(self) -> None:
+        from src.scoring import soft_early_form_rates
+
+        form = _empty_rates()
+        form.update({"apps": 1.0, "gls_pa": 1.0, "ast_pa": 0.0, "xg_pa": 0.9})
+        base = _empty_rates()
+        base.update({"apps": 30.0, "gls_pa": 0.25, "ast_pa": 0.20, "xg_pa": 0.22})
+        softened = soft_early_form_rates(form, base, 1.0, 30.0)
+        self.assertLess(softened["gls_pa"], 0.40)
+        self.assertGreater(softened["gls_pa"], base["gls_pa"])
+
+    def test_fixture_cs_floor_preserves_strong_team_edge(self) -> None:
+        from src.config import FIXTURE_CS_FLOOR
+
+        self.assertGreaterEqual(FIXTURE_CS_FLOOR, 0.85)
+        basaksehir = 0.43 * 0.85
+        rizespor = 0.30 * 1.0
+        self.assertGreater(basaksehir, rizespor)
+
+    def test_formation_rescore_prefers_three_forwards_when_bench_star_is_valuable(self) -> None:
+        from src.optimize import rescore_formations
+
+        rows = []
+        teams = list("ABCDEFGHIJKLMNO")
+        # 2 GK
+        rows += [
+            {"player": "GK1", "team": teams[0], "position": "GK", "price_m": 4.0, "pts_if_plays": 4.0, "play_probability": 0.95, "projected_pts": 3.8},
+            {"player": "GK2", "team": teams[1], "position": "GK", "price_m": 4.0, "pts_if_plays": 2.0, "play_probability": 0.4, "projected_pts": 0.8},
+        ]
+        # 5 DF
+        for i in range(5):
+            rows.append(
+                {
+                    "player": f"DF{i}",
+                    "team": teams[2 + i],
+                    "position": "DF",
+                    "price_m": 4.5,
+                    "pts_if_plays": 3.2 - i * 0.05,
+                    "play_probability": 0.9,
+                    "projected_pts": 2.8,
+                }
+            )
+        # 5 MF
+        for i in range(5):
+            rows.append(
+                {
+                    "player": f"MF{i}",
+                    "team": teams[7 + i] if 7 + i < len(teams) else f"T{i}",
+                    "position": "MF",
+                    "price_m": 5.0,
+                    "pts_if_plays": 3.5 - i * 0.1,
+                    "play_probability": 0.9,
+                    "projected_pts": 3.0,
+                }
+            )
+        # 3 FW: expensive high-EV third forward should start in 3-FW shapes
+        rows += [
+            {"player": "Osimhen", "team": "Galatasaray", "position": "FW", "price_m": 14.0, "pts_if_plays": 7.0, "play_probability": 0.95, "projected_pts": 6.6},
+            {"player": "Shomu", "team": "Fenerbahce", "position": "FW", "price_m": 10.0, "pts_if_plays": 6.0, "play_probability": 0.95, "projected_pts": 5.7},
+            {"player": "Talisca", "team": "Fenerbahce", "position": "FW", "price_m": 8.5, "pts_if_plays": 5.8, "play_probability": 0.92, "projected_pts": 5.3},
+        ]
+        squad = pd.DataFrame(rows)
+        formations = {
+            "3-5-2": {"GK": 1, "DF": 3, "MF": 5, "FW": 2},
+            "3-4-3": {"GK": 1, "DF": 3, "MF": 4, "FW": 3},
+            "4-3-3": {"GK": 1, "DF": 4, "MF": 3, "FW": 3},
+        }
+        best = rescore_formations(squad, formations, autosub_draws=80)
+        self.assertIn(best["formation"], ("3-4-3", "4-3-3"))
+        self.assertIn("Talisca", best["xi"]["player"].tolist())
+
+    def test_card_budget_raises_threshold_when_rights_are_scarce(self) -> None:
+        from src.manager_cards import choose_manager_card, opportunity_threshold
+
+        self.assertGreater(
+            opportunity_threshold(6.0, remaining=2, weeks_left=20),
+            opportunity_threshold(6.0, remaining=10, weeks_left=34),
+        )
+        hold = choose_manager_card(
+            [{"card": "Tripleks Kaptan", "extra_pts": 6.4, "why": "3x"}],
+            remaining=2,
+            weeks_left=20,
+        )
+        self.assertFalse(hold["use"])
+        self.assertEqual(hold["remaining"], 2)
+
+    def test_league_evaluation_promotes_only_better_than_identity(self) -> None:
+        from calibrate_leagues import evaluate_leagues_forward
+
+        samples = []
+        for year in (2020, 2021, 2022, 2023, 2024):
+            for i in range(20):
+                src = 0.4 + 0.02 * i
+                samples.append(
+                    {
+                        "player_id": year * 100 + i,
+                        "source_tournament_id": 17,
+                        "source_league": "Premier League",
+                        "position": "FW",
+                        "target_season_start": year,
+                        "source_minutes": 2000.0,
+                        "target_minutes": 1800.0,
+                        "source_apps": 34.0,
+                        "target_apps": 30.0,
+                        "source_goals": src * 20,
+                        "source_assists": 5.0,
+                        "target_goals": src * 14,
+                        "target_assists": 3.0,
+                        "source_xg": src * 18,
+                        "target_xg": src * 13,
+                        "source_xa": 4.0,
+                        "target_xa": 3.0,
+                        "source_key_passes": 30.0,
+                        "target_key_passes": 22.0,
+                        "source_shots_on_target": 40.0,
+                        "target_shots_on_target": 28.0,
+                        "source_saves": 0.0,
+                        "target_saves": 0.0,
+                        "source_clean_sheets": 0.0,
+                        "target_clean_sheets": 0.0,
+                        "source_goals_conceded": 0.0,
+                        "target_goals_conceded": 0.0,
+                        "source_yellow_cards": 2.0,
+                        "target_yellow_cards": 2.0,
+                        "source_red_cards": 0.0,
+                        "target_red_cards": 0.0,
+                        "source_rating": 7.0,
+                        "target_rating": 6.8,
+                        "source_has_xg": True,
+                        "target_has_xg": True,
+                        "source_has_xa": True,
+                        "target_has_xa": True,
+                        "source_has_key_passes": True,
+                        "target_has_key_passes": True,
+                        "source_has_shots_on_target": True,
+                        "target_has_shots_on_target": True,
+                    }
+                )
+            for i in range(8):
+                src = 0.5 + 0.03 * i
+                samples.append(
+                    {
+                        "player_id": 9000 + year * 10 + i,
+                        "source_tournament_id": 99,
+                        "source_league": "Noise League",
+                        "position": "FW",
+                        "target_season_start": year,
+                        "source_minutes": 1600.0,
+                        "target_minutes": 1500.0,
+                        "source_apps": 28.0,
+                        "target_apps": 25.0,
+                        "source_goals": src * 25,
+                        "source_assists": 2.0,
+                        "target_goals": 2.0 + (i % 3),
+                        "target_assists": 1.0,
+                        "source_xg": src * 20,
+                        "target_xg": 2.0,
+                        "source_xa": 2.0,
+                        "target_xa": 1.0,
+                        "source_key_passes": 20.0,
+                        "target_key_passes": 10.0,
+                        "source_shots_on_target": 30.0,
+                        "target_shots_on_target": 12.0,
+                        "source_saves": 0.0,
+                        "target_saves": 0.0,
+                        "source_clean_sheets": 0.0,
+                        "target_clean_sheets": 0.0,
+                        "source_goals_conceded": 0.0,
+                        "target_goals_conceded": 0.0,
+                        "source_yellow_cards": 1.0,
+                        "target_yellow_cards": 1.0,
+                        "source_red_cards": 0.0,
+                        "target_red_cards": 0.0,
+                        "source_rating": 7.2,
+                        "target_rating": 6.5,
+                        "source_has_xg": True,
+                        "target_has_xg": True,
+                        "source_has_xa": True,
+                        "target_has_xa": True,
+                        "source_has_key_passes": True,
+                        "target_has_key_passes": True,
+                        "source_has_shots_on_target": True,
+                        "target_has_shots_on_target": True,
+                    }
+                )
+
+        report = evaluate_leagues_forward(samples)
+        self.assertIn("summary", report)
+        self.assertIn("leagues", report)
+        noise = report["leagues"].get("99", {})
+        if noise:
+            promotes = [
+                row.get("promote")
+                for pos in (noise.get("positions") or {}).values()
+                for row in pos.values()
+            ]
+            self.assertTrue(any(p is False for p in promotes) or not promotes)
+
 
 if __name__ == "__main__":
     unittest.main()

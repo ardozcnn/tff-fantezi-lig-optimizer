@@ -29,6 +29,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Haftalık kadro/fikstür/kart özet PNG dosyası",
     )
     p.add_argument(
+        "--set-cards-remaining",
+        type=int,
+        default=None,
+        help="Sezonluk kalan menajer kart hakkını yerelde güncelle (0-10)",
+    )
+    p.add_argument(
+        "--weeks-left",
+        type=int,
+        default=None,
+        help="Kart fırsat maliyeti için kalan hafta (isteğe bağlı)",
+    )
+    p.add_argument(
         "--verbose",
         action="store_true",
         help="Ayrıntılı analiz logu (varsayılan: sade kadro çıktısı)",
@@ -40,6 +52,19 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     os.environ.setdefault("FBREF_SSL_VERIFY", "0")
     os.environ.setdefault("TFF_QUIET", "0" if args.verbose else "1")
+
+    if args.set_cards_remaining is not None:
+        from .manager_cards import set_cards_remaining
+
+        state = set_cards_remaining(
+            args.set_cards_remaining,
+            season=args.season,
+            weeks_left=args.weeks_left,
+        )
+        print(
+            f"Kart durumu güncellendi: kalan {state['remaining']}/{state['budget']} "
+            f"(sezon {state['season']}, kalan hafta {state['weeks_left']})"
+        )
 
     from .pipeline import run_cli_pipeline
 

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from .autosub import expected_squad_points
-from .config import BUDGET_M
+from .config import (
+    BUDGET_M,
+    CARD_STATE_FILE,
+    SEASON_CARD_BUDGET,
+    SEASON_MATCHWEEKS,
+)
 from .optimize import optimize_squad
 
 CARD_USE_THRESHOLDS = {
@@ -16,6 +24,98 @@ CARD_USE_THRESHOLDS = {
     "Tüm Takım Sahaya": 8.0,
     "Hücum": 2.0,
 }
+
+
+def default_card_state(season: int | None = None) -> dict[str, Any]:
+    return {
+        "season": int(season or datetime.now(timezone.utc).year),
+        "budget": SEASON_CARD_BUDGET,
+        "used": 0,
+        "remaining": SEASON_CARD_BUDGET,
+        "weeks_left": SEASON_MATCHWEEKS,
+        "history": [],
+    }
+
+
+def load_card_state(
+    path: Path | str | None = None,
+    *,
+    season: int | None = None,
+) -> dict[str, Any]:
+    target = Path(path) if path else CARD_STATE_FILE
+    state = default_card_state(season)
+    if not target.exists():
+        return state
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return state
+    if not isinstance(payload, dict):
+        return state
+    state.update(payload)
+    budget = int(state.get("budget") or SEASON_CARD_BUDGET)
+    used = int(state.get("used") or 0)
+    remaining = state.get("remaining")
+    if remaining is None:
+        remaining = max(0, budget - used)
+    state["budget"] = budget
+    state["used"] = used
+    state["remaining"] = max(0, int(remaining))
+    state["weeks_left"] = int(state.get("weeks_left") or SEASON_MATCHWEEKS)
+    if season is not None and int(state.get("season") or 0) != int(season):
+        return default_card_state(season)
+    return state
+
+
+def save_card_state(state: dict[str, Any], path: Path | str | None = None) -> Path:
+    target = Path(path) if path else CARD_STATE_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = dict(state)
+    payload["remaining"] = max(
+        0,
+        int(payload.get("remaining", payload.get("budget", SEASON_CARD_BUDGET) - payload.get("used", 0))),
+    )
+    target.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return target
+
+
+def set_cards_remaining(
+    remaining: int,
+    *,
+    path: Path | str | None = None,
+    season: int | None = None,
+    weeks_left: int | None = None,
+) -> dict[str, Any]:
+    state = load_card_state(path, season=season)
+    budget = int(state.get("budget") or SEASON_CARD_BUDGET)
+    left = max(0, min(budget, int(remaining)))
+    state["remaining"] = left
+    state["used"] = max(0, budget - left)
+    if weeks_left is not None:
+        state["weeks_left"] = max(0, int(weeks_left))
+    if season is not None:
+        state["season"] = int(season)
+    save_card_state(state, path)
+    return state
+
+
+def opportunity_threshold(
+    base: float,
+    *,
+    remaining: int,
+    weeks_left: int,
+    budget: int = SEASON_CARD_BUDGET,
+) -> float:
+    """Kalan hak / kalan haftaya göre fırsat maliyeti eşiği."""
+    if remaining <= 0:
+        return float("inf")
+    pace = (SEASON_MATCHWEEKS / max(budget, 1))
+    current = (max(weeks_left, 1) / max(remaining, 1))
+    scarcity = current / max(pace, 1e-9)
+    return float(base) * max(1.0, scarcity)
 
 
 def manager_card_advice(
@@ -27,9 +127,7 @@ def manager_card_advice(
     """Kartları mevcut haftanın beklenen puan farkına göre sırala.
 
     Normal kaptan 2x kabul edilir. Bu nedenle Tripleks'in getirisi +1x,
-    Dört Dörtlük'ün getirisi +2x kaptan puanıdır. Kart envanteri kullanıcı
-    hesabından okunmadığı için bu fonksiyon kullanım adedi değil, fırsat
-    sıralaması üretir.
+    Dört Dörtlük'ün getirisi +2x kaptan puanıdır.
     """
     xi = result.get("xi")
     bench = result.get("bench")
@@ -103,42 +201,87 @@ def manager_card_advice(
     )
 
 
-def choose_manager_card(advice: list[dict[str, Any]]) -> dict[str, Any]:
+def choose_manager_card(
+    advice: list[dict[str, Any]],
+    *,
+    remaining: int | None = None,
+    weeks_left: int | None = None,
+    budget: int = SEASON_CARD_BUDGET,
+    card_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Haftada en fazla bir kart öner; fırsat zayıfsa tüm kartları sakla."""
-    scored: list[tuple[float, dict[str, Any]]] = []
+    state = card_state or {}
+    left = int(
+        remaining
+        if remaining is not None
+        else state.get("remaining", SEASON_CARD_BUDGET)
+    )
+    weeks = int(
+        weeks_left
+        if weeks_left is not None
+        else state.get("weeks_left", SEASON_MATCHWEEKS)
+    )
+    if left <= 0:
+        return {
+            "use": False,
+            "card": "Kart kullanma",
+            "extra_pts": 0.0,
+            "remaining": 0,
+            "weeks_left": weeks,
+            "why": (
+                f"Sezonluk {budget} kart hakkının tamamı kullanılmış; "
+                "bu hafta kart önermiyorum."
+            ),
+        }
+
+    scored: list[tuple[float, float, dict[str, Any]]] = []
     for item in advice:
-        threshold = CARD_USE_THRESHOLDS.get(str(item.get("card") or ""))
+        base = CARD_USE_THRESHOLDS.get(str(item.get("card") or ""))
         extra = item.get("extra_pts")
-        if threshold and extra is not None:
-            scored.append((float(extra) / threshold, item))
+        if base and extra is not None:
+            threshold = opportunity_threshold(
+                base, remaining=left, weeks_left=weeks, budget=budget
+            )
+            scored.append((float(extra) / threshold, threshold, item))
     if not scored:
         return {
             "use": False,
             "card": "Kart kullanma",
             "extra_pts": 0.0,
-            "why": "Bu hafta ölçülebilir kart fırsatı yok; hakları sonraki haftaya sakla.",
+            "remaining": left,
+            "weeks_left": weeks,
+            "why": (
+                f"Bu hafta ölçülebilir kart fırsatı yok; "
+                f"kalan {left}/{budget} hakkı sonraki haftaya sakla."
+            ),
         }
 
-    ratio, best = max(scored, key=lambda pair: pair[0])
-    threshold = CARD_USE_THRESHOLDS[str(best["card"])]
+    ratio, threshold, best = max(scored, key=lambda pair: pair[0])
     if ratio < 1.0:
         return {
             "use": False,
             "card": "Kart kullanma",
             "extra_pts": round(float(best["extra_pts"]), 2),
             "candidate": best["card"],
+            "remaining": left,
+            "weeks_left": weeks,
+            "threshold": round(float(threshold), 2),
             "why": (
                 f"En iyi aday {best['card']} (+{float(best['extra_pts']):.2f}p), "
-                f"ama kullanım eşiği +{threshold:.0f}p. Haftada tek kart ve kart başına "
-                "iki hak olduğu için bu hafta sakla; sonraki hafta yeniden bak."
+                f"ama fırsat maliyeti eşiği +{threshold:.1f}p "
+                f"(kalan {left} kart / {weeks} hafta). Bu hafta sakla."
             ),
         }
     return {
         "use": True,
         "card": best["card"],
         "extra_pts": round(float(best["extra_pts"]), 2),
+        "remaining": left,
+        "weeks_left": weeks,
+        "threshold": round(float(threshold), 2),
         "why": (
             f"{best['why']}; +{float(best['extra_pts']):.2f}p fırsat "
-            f"+{threshold:.0f}p kullanım eşiğini geçti. Bu hafta yalnız bu kartı kullan."
+            f"+{threshold:.1f}p eşiğini geçti. Kalan hak {left}/{budget}. "
+            "Bu hafta yalnız bu kartı kullan."
         ),
     }

@@ -14,7 +14,14 @@ from typing import Any
 import pandas as pd
 from curl_cffi import requests as curl_requests
 
-from .config import CACHE_DIR, FORM_MATCHES, REQUEST_DELAY_S, is_quiet
+from .config import (
+    CACHE_DIR,
+    FIXTURE_CS_CEILING,
+    FIXTURE_CS_FLOOR,
+    FORM_MATCHES,
+    REQUEST_DELAY_S,
+    is_quiet,
+)
 from .names import normalize_name
 
 
@@ -352,7 +359,7 @@ def build_fixture_context(
             "opponent": opponent,
             "home": home,
             "attack_mult": max(0.78, min(1.22, attack_mult)),
-            "cs_mult": max(0.75, min(1.25, cs_mult)),
+            "cs_mult": max(FIXTURE_CS_FLOOR, min(FIXTURE_CS_CEILING, cs_mult)),
         }
 
     for event in events:
