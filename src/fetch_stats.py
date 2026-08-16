@@ -20,6 +20,7 @@ from .config import (
     FIXTURE_CS_FLOOR,
     FORM_MATCHES,
     REQUEST_DELAY_S,
+    TEAM_CS_PRIOR_MATCHES,
     is_quiet,
 )
 from .names import normalize_name
@@ -930,7 +931,7 @@ def blend_team_cs_rates(
 ) -> dict[str, float]:
     """
     Erken sezon tek maç CS=%100 / oynamayan takım CS=%0 gürültüsünü
-    önceki sezonla küçültür.
+    önceki sezonla sürekli Bayes ağırlığıyla küçültür (sert 4 maç cliff yok).
     """
     current_apps = current_apps or {}
     teams = set(current) | set(previous) | set(current_apps)
@@ -942,10 +943,7 @@ def blend_team_cs_rates(
         if curr is None or n <= 0:
             out[team] = float(prev)
             continue
-        if n >= 4:
-            out[team] = float(curr)
-            continue
-        weight = n / (n + prior_matches)
+        weight = n / (n + float(prior_matches))
         out[team] = weight * float(curr) + (1.0 - weight) * float(prev)
     return out
 
@@ -1071,6 +1069,7 @@ def load_dual_season_stats(
         base_cs_current,
         base_cs_prev,
         team_season_apps_from_df(current_season),
+        prior_matches=TEAM_CS_PRIOR_MATCHES,
     )
     if not base_cs:
         base_cs = base_cs_prev or base_cs_current

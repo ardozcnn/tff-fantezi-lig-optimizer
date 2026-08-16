@@ -16,8 +16,18 @@ from .league_translation import (
     translate_metric_mixture,
 )
 from .names import best_match, name_variants, normalize_name
-from .scoring import expected_points_from_rates, map_position, rates_from_totals
-from .config import ESTABLISHED_SL_APPS, EXTERNAL_OPENER_PRIOR_MATCHES
+from .scoring import (
+    blend_goalkeeper_components,
+    effective_match_sample,
+    expected_points_from_rates,
+    map_position,
+    rates_from_totals,
+)
+from .config import (
+    ESTABLISHED_SL_APPS,
+    EXTERNAL_OPENER_PRIOR_MATCHES,
+    GK_SAVES_PRIOR_MATCHES,
+)
 
 DOMESTIC_LEAGUES: dict[int, str] = {
     17: "Premier League",
@@ -633,6 +643,13 @@ def project_external_player(
         f"{rates.get('apps', 0):.0f} maç ölçeği); "
         f"{calibration_note}; TFF {tff_position}"
     )
+    if str(tff_position).upper() == "GK":
+        reason += (
+            f"; kurtarış {float(rates.get('saves_pa') or 0):.2f}/maç "
+            f"(ham {float(row.get('saves') or 0):.0f}); "
+            f"kişisel CS {float(rates.get('cs_rate') or 0):.0%} "
+            f"(ham {float(row.get('cs') or 0):.0f})"
+        )
     return {
         "projected_pts": round(float(pts), 3),
         "base_pts": round(float(pts), 3),
@@ -646,6 +663,8 @@ def project_external_player(
         "xa_pa": round(rates.get("xa_pa") or 0.0, 3),
         "int_p90": round(rates.get("int_p90") or 0.0, 2),
         "tkl_p90": round(rates.get("tkl_p90") or 0.0, 2),
+        "saves_pa": round(rates.get("saves_pa") or 0.0, 3),
+        "share_60": round(rates.get("share_60") or 0.0, 3),
         "data_src": "external_prior",
         "base_src": src,
         "reason": reason,
@@ -659,6 +678,13 @@ def project_external_player(
         "ext_xa": row.get("xa") or 0,
         "ext_apps": rates.get("apps") or 0,
         "ext_minutes": row.get("minutes") or 0,
+        "ext_saves": row.get("saves") or 0,
+        "ext_cs": row.get("cs") or 0,
+        "ext_saves_pa": round(float(source_rates.get("saves_pa") or 0.0), 3),
+        "ext_cs_rate": round(float(source_rates.get("cs_rate") or 0.0), 4),
+        "translated_saves_pa": round(float(rates.get("saves_pa") or 0.0), 3),
+        "translated_cs_rate": round(float(rates.get("cs_rate") or 0.0), 4),
+        "league_calibration_note": calibration_note,
         "rating": row.get("rating") or 0,
         "friendly_minutes": friendly_min,
         "ext_tournament_id": tid,
@@ -781,11 +807,6 @@ def apply_external_priors(
             float(r.get("form_apps") or 0),
             float(r.get("current_apps") or 0),
         )
-        position = str(r.get("position") or "").upper()
-        # Kaleci: tek SL maçındaki CS/kurtarış zaten yüksek sinyal;
-        # Bundesliga geçmişi tek kurtarışlı açılışı şişirmesin.
-        if position == "GK" and not unmatched and current_apps >= 1:
-            return False
         sl_minutes = float(r.get("min_per_app") or 0) * max(
             prev_apps, current_apps, 1.0
         )
@@ -875,14 +896,22 @@ def apply_external_priors(
                 else 0.0,
             )
             position = str(df.at[idx, "position"] or "").upper()
-            if position == "GK" and current_apps >= 1:
-                continue
             sl_pts = float(df.at[idx, "projected_pts"] or 0)
             sl_apps = prev_apps + current_apps
-            tff_minutes = float(df.at[idx, "tff_minutes"] or 0) if "tff_minutes" in df.columns else 0.0
-            sl_minutes = float(df.at[idx, "min_per_app"] or 0) * max(prev_apps, current_apps, 1.0)
+            tff_minutes = (
+                float(df.at[idx, "tff_minutes"] or 0)
+                if "tff_minutes" in df.columns
+                else 0.0
+            )
+            current_minutes = float(
+                df.at[idx, "current_minutes"] or 0
+            ) if "current_minutes" in df.columns else 0.0
+            sl_minutes = float(df.at[idx, "min_per_app"] or 0) * max(
+                prev_apps, current_apps, 1.0
+            )
             if tff_minutes > 0:
                 sl_minutes = max(sl_minutes, tff_minutes)
+                current_minutes = max(current_minutes, tff_minutes)
                 current_apps = max(current_apps, tff_minutes / 75.0)
                 sl_apps = prev_apps + current_apps
             if (
@@ -901,7 +930,9 @@ def apply_external_priors(
                     "form_apps",
                     "base_apps",
                     "current_apps",
+                    "current_minutes",
                     "prev_apps",
+                    "prev_minutes",
                     "established_sl_apps",
                     "min_per_app",
                     "gls_pa",
@@ -920,14 +951,90 @@ def apply_external_priors(
                     "cs_raw",
                     "cs_after_fixture",
                     "saves_contrib",
+                    "saves_pa",
+                    "current_saves_pa",
+                    "prior_saves_pa",
                     "gk_play_prob",
                     "fixture_cs_note",
+                    "share_60",
                 )
-                if field in df.columns and pd.notna(df.at[idx, field]) and str(df.at[idx, field]) not in ("", "nan")
+                if field in df.columns
+                and pd.notna(df.at[idx, field])
+                and str(df.at[idx, field]) not in ("", "nan")
             }
             had_sl = (prev_apps >= 1 or current_apps >= 1) and sl_pts > 0
 
-            if prev_apps >= 4 or (current_apps >= 4 and sl_minutes >= 240 and sl_pts > 0):
+            if position == "GK" and (
+                had_sl or float(proj.get("translated_saves_pa") or 0) > 0
+            ):
+                current_saves = float(
+                    preserve.get("current_saves_pa")
+                    or preserve.get("saves_pa")
+                    or 0.0
+                )
+                prior_saves = float(proj.get("translated_saves_pa") or 0.0)
+                sample = effective_match_sample(current_apps, current_minutes)
+                team_cs = (
+                    float(df.at[idx, "team_cs_base"])
+                    if pd.notna(df.at[idx, "team_cs_base"])
+                    else float(proj.get("translated_cs_rate") or 0.0)
+                )
+                pack = blend_goalkeeper_components(
+                    current_saves_pa=current_saves,
+                    prior_saves_pa=prior_saves,
+                    current_sample=sample,
+                    team_cs=team_cs,
+                    personal_prior_cs=float(proj.get("translated_cs_rate") or 0.0)
+                    or None,
+                    share_60=float(
+                        preserve.get("share_60")
+                        or proj.get("share_60")
+                        or 1.0
+                    ),
+                    min_per_app=float(
+                        preserve.get("min_per_app")
+                        or proj.get("min_per_app")
+                        or 90.0
+                    ),
+                    saves_prior_matches=GK_SAVES_PRIOR_MATCHES,
+                    fixture_attack_mult=float(
+                        df.at[idx, "fixture_attack_mult"] or 1.0
+                    ),
+                    fixture_cs_mult=float(df.at[idx, "fixture_cs_mult"] or 1.0),
+                    rating=float(proj.get("rating") or 0.0),
+                )
+                league = str(proj.get("ext_league") or "dış lig")
+                level = str(proj.get("league_calibration_level") or "identity")
+                proj["projected_pts"] = pack["projected_pts"]
+                proj["base_pts"] = pack["projected_pts"]
+                proj["saves_pa"] = pack["saves_pa"]
+                proj["saves_contrib"] = pack["saves_contrib"]
+                proj["w_saves_current"] = pack["w_saves_current"]
+                proj["w_saves_prior"] = pack["w_saves_prior"]
+                proj["cs_raw"] = pack["cs_raw"]
+                proj["cs_after_fixture"] = pack["cs_after_fixture"]
+                proj["prior_saves_pa"] = prior_saves
+                proj["current_saves_pa"] = current_saves
+                proj["data_src"] = "external_blend" if had_sl else "external_prior"
+                proj["reason"] = (
+                    f"kurtarış: {league} {float(proj.get('ext_saves_pa') or 0):.2f}/maç "
+                    f"→ SL {prior_saves:.2f}; 2026-27 {current_saves:.2f}; "
+                    f"ağırlık {pack['w_saves_prior']:.0%}/{pack['w_saves_current']:.0%}; "
+                    f"CS: takım {pack['cs_raw']:.0%} "
+                    f"(kişisel prior {float(proj.get('translated_cs_rate') or 0):.0%}, "
+                    f"ham {float(proj.get('ext_cs') or 0):.0f} CS / "
+                    f"{float(proj.get('ext_saves') or 0):.0f} kurtarış); "
+                    f"fikstür sonrası {pack['cs_after_fixture']:.0%}; "
+                    f"kalibrasyon {level}"
+                    + (
+                        f"; {proj.get('league_calibration_note')}"
+                        if proj.get("league_calibration_note")
+                        else ""
+                    )
+                )
+            elif prev_apps >= 4 or (
+                current_apps >= 4 and sl_minutes >= 240 and sl_pts > 0
+            ):
                 blended = 0.55 * sl_pts + 0.45 * proj["projected_pts"]
                 proj["projected_pts"] = round(blended, 3)
                 proj["reason"] = (
@@ -954,6 +1061,17 @@ def apply_external_priors(
                 df.at[idx, k] = v
             if had_sl:
                 for field, value in preserve.items():
+                    if position == "GK" and field in (
+                        "projected_pts",
+                        "saves_pa",
+                        "saves_contrib",
+                        "cs_raw",
+                        "cs_after_fixture",
+                        "prior_saves_pa",
+                        "current_saves_pa",
+                        "w_saves_current",
+                    ):
+                        continue
                     df.at[idx, field] = value
                 if not str(df.at[idx, "data_src"] or ""):
                     df.at[idx, "data_src"] = "external_blend"

@@ -198,6 +198,14 @@ class ScoringTests(unittest.TestCase):
         self.assertLess(blended["Rizespor"], 0.45)
         self.assertAlmostEqual(blended["Başakşehir"], 0.36)
 
+        four = blend_team_cs_rates(
+            {"Rizespor": 1.0},
+            {"Rizespor": 0.30},
+            {"Rizespor": 4.0},
+        )
+        self.assertLess(four["Rizespor"], 1.0)
+        self.assertAlmostEqual(four["Rizespor"], 4 / 12 * 1.0 + 8 / 12 * 0.30, places=5)
+
         perfect = expected_points_from_rates(
             {"apps": 10, "share_60": 1.0, "min_per_app": 90, "saves_pa": 3.0},
             "GK",
@@ -851,7 +859,7 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(out.loc[0, "data_src"], "super_lig")
         self.assertEqual(float(out.loc[0, "prev_apps"]), 33.0)
 
-    def test_goalkeeper_with_super_lig_opener_skips_external_blend(self) -> None:
+    def test_goalkeeper_opener_keeps_external_saves_as_component_blend(self) -> None:
         from src.fetch_external import apply_external_priors
 
         frame = pd.DataFrame(
@@ -865,14 +873,38 @@ class ScoringTests(unittest.TestCase):
                     "stats_player": "Alexander Nübel",
                     "form_apps": 1.0,
                     "current_apps": 1.0,
+                    "current_minutes": 90.0,
                     "prev_apps": 0.0,
                     "established_sl_apps": 0.0,
                     "base_apps": 1.0,
                     "min_per_app": 90.0,
+                    "share_60": 1.0,
+                    "saves_pa": 1.0,
+                    "current_saves_pa": 1.0,
+                    "team_cs_base": 0.40,
+                    "fixture_cs_mult": 1.0,
+                    "fixture_attack_mult": 1.0,
                     "data_src": "super_lig",
                 }
             ]
         )
+        external = {
+            "projected_pts": 6.0,
+            "reason": "Bundesliga",
+            "data_src": "external_prior",
+            "ext_league": "Bundesliga",
+            "ext_saves": 109,
+            "ext_cs": 11,
+            "ext_saves_pa": 3.30,
+            "ext_cs_rate": 0.333,
+            "translated_saves_pa": 3.0,
+            "translated_cs_rate": 0.27,
+            "share_60": 1.0,
+            "min_per_app": 90.0,
+            "league_calibration_level": "global",
+            "league_calibration_note": "global küçültme",
+            "rating": 7.0,
+        }
         with (
             patch(
                 "src.fetch_external.resolve_one",
@@ -880,17 +912,77 @@ class ScoringTests(unittest.TestCase):
             ),
             patch(
                 "src.fetch_external.project_external_player",
-                return_value={
-                    "projected_pts": 6.0,
-                    "reason": "Bundesliga",
-                    "data_src": "external_prior",
-                },
+                return_value=external,
             ),
         ):
             out = apply_external_priors(frame, max_fetch=1)
 
-        self.assertEqual(out.loc[0, "data_src"], "super_lig")
-        self.assertAlmostEqual(float(out.loc[0, "projected_pts"]), 3.26)
+        self.assertEqual(out.loc[0, "data_src"], "external_blend")
+        self.assertEqual(float(out.loc[0, "ext_saves"]), 109)
+        self.assertEqual(float(out.loc[0, "ext_cs"]), 11)
+        # 1 maç: w_current = 1/5 = 0.2 → 0.2*1 + 0.8*3 = 2.6
+        self.assertAlmostEqual(float(out.loc[0, "saves_pa"]), 2.6, places=3)
+        self.assertLess(float(out.loc[0, "projected_pts"]), 6.0)
+        self.assertGreater(float(out.loc[0, "projected_pts"]), 3.26)
+        self.assertIn("kurtarış:", str(out.loc[0, "reason"]))
+
+    def test_goalkeeper_season_transition_weights_are_monotonic(self) -> None:
+        from src.scoring import blend_goalkeeper_components, season_sample_weight
+
+        weights = [
+            season_sample_weight(n, 4.0) for n in (0, 1, 3, 6, 10, 20)
+        ]
+        self.assertEqual(weights[0], 0.0)
+        self.assertAlmostEqual(weights[1], 1 / 5)
+        self.assertAlmostEqual(weights[2], 3 / 7)
+        self.assertAlmostEqual(weights[3], 6 / 10)
+        self.assertAlmostEqual(weights[4], 10 / 14)
+        self.assertAlmostEqual(weights[5], 20 / 24)
+        self.assertEqual(weights, sorted(weights))
+
+        packs = [
+            blend_goalkeeper_components(
+                current_saves_pa=1.0,
+                prior_saves_pa=3.3,
+                current_sample=float(n),
+                team_cs=0.40,
+            )
+            for n in (0, 1, 3, 6, 10, 20)
+        ]
+        saves = [p["saves_pa"] for p in packs]
+        prior_w = [p["w_saves_prior"] for p in packs]
+        self.assertEqual(saves, sorted(saves, reverse=True))
+        self.assertEqual(prior_w, sorted(prior_w, reverse=True))
+        self.assertAlmostEqual(packs[0]["saves_pa"], 3.3, places=3)
+        self.assertAlmostEqual(packs[-1]["saves_pa"], 20 / 24 * 1.0 + 4 / 24 * 3.3, places=3)
+
+    def test_nubel_and_sengezer_component_priors_compare_fairly(self) -> None:
+        from src.scoring import blend_goalkeeper_components
+
+        nubel = blend_goalkeeper_components(
+            current_saves_pa=1.0,
+            prior_saves_pa=109 / 33,
+            current_sample=1.0,
+            team_cs=0.40,
+            personal_prior_cs=11 / 33,
+            fixture_cs_mult=1.01,
+        )
+        sengezer = blend_goalkeeper_components(
+            current_saves_pa=4.0,
+            prior_saves_pa=105 / 33,
+            current_sample=1.0,
+            team_cs=0.43,
+            personal_prior_cs=12 / 33,
+            fixture_cs_mult=0.85,
+        )
+        self.assertGreater(nubel["saves_pa"], 2.5)
+        self.assertGreater(sengezer["saves_pa"], 3.0)
+        self.assertAlmostEqual(nubel["personal_prior_cs"], 11 / 33, places=4)
+        self.assertAlmostEqual(sengezer["personal_prior_cs"], 12 / 33, places=4)
+        # CS puanı kişisel Bundesliga/SL CS'den değil takım+fikstürden gelir.
+        self.assertAlmostEqual(nubel["cs_raw"], 0.40, places=4)
+        self.assertAlmostEqual(sengezer["cs_raw"], 0.43, places=4)
+        self.assertLess(sengezer["cs_after_fixture"], sengezer["cs_raw"])
 
     def test_limited_super_lig_history_can_blend_external_prior(self) -> None:
         from src.fetch_external import apply_external_priors

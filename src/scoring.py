@@ -15,10 +15,12 @@ from .config import (
     COUNT_PRIOR_MATCHES,
     COUNT_RATE_KEYS,
     CS_POINTS,
+    EARLY_SEASON_FORM_CAP_APPS,
     ESTABLISHED_SL_APPS,
     FIXTURE_CS_CEILING,
     FIXTURE_CS_FLOOR,
     FORM_PRIOR_MATCHES,
+    GK_SAVES_PRIOR_MATCHES,
     GOAL_POINTS,
     KEYPASS_TO_ASSIST,
     MIN_60_POINTS,
@@ -330,6 +332,92 @@ def soft_early_form_rates(
     return out
 
 
+def season_sample_weight(n_effective: float, prior_matches: float) -> float:
+    """Mevcut sezon örneği büyüdükçe prior'dan current'a kayan Bayes ağırlığı."""
+    n = max(0.0, float(n_effective or 0.0))
+    prior = max(1e-9, float(prior_matches or 0.0))
+    return n / (n + prior)
+
+
+def effective_match_sample(apps: float, minutes: float) -> float:
+    """Kaleci/oyuncu için efektif maç örneği: dakika/90 ile apps'in büyüğü."""
+    apps_n = max(0.0, float(apps or 0.0))
+    minutes_n = max(0.0, float(minutes or 0.0))
+    return max(apps_n, minutes_n / 90.0)
+
+
+def blend_goalkeeper_components(
+    *,
+    current_saves_pa: float,
+    prior_saves_pa: float,
+    current_sample: float,
+    team_cs: float,
+    personal_prior_cs: float | None = None,
+    share_60: float = 1.0,
+    min_per_app: float = 90.0,
+    saves_prior_matches: float = GK_SAVES_PRIOR_MATCHES,
+    fixture_attack_mult: float = 1.0,
+    fixture_cs_mult: float = 1.0,
+    rating: float = 0.0,
+) -> dict[str, Any]:
+    """
+    Kaleci: kurtarış kişisel prior+current harmanı; CS puanı takım oranından.
+    Kişisel geçmiş CS yalnız denetim/fallback için saklanır.
+    """
+    w_saves = season_sample_weight(current_sample, saves_prior_matches)
+    blended_saves = w_saves * float(current_saves_pa or 0.0) + (
+        1.0 - w_saves
+    ) * float(prior_saves_pa or 0.0)
+    team_cs_rate = float(team_cs or 0.0)
+    if team_cs_rate <= 0 and personal_prior_cs is not None:
+        team_cs_rate = float(personal_prior_cs)
+    rates = {
+        "apps": max(1.0, float(current_sample or 1.0)),
+        "share_60": max(0.0, min(1.0, float(share_60 or 0.0))),
+        "min_per_app": float(min_per_app or 90.0),
+        "saves_pa": blended_saves,
+        "cs_rate": team_cs_rate,
+        "rating": float(rating or 0.0),
+        "gls_pa": 0.0,
+        "ast_pa": 0.0,
+        "xg_pa": 0.0,
+        "xa_pa": 0.0,
+        "yc_pa": 0.0,
+        "rc_pa": 0.0,
+        "pen_save_pa": 0.0,
+        "pen_miss_pa": 0.0,
+        "og_pa": 0.0,
+    }
+    cs_after = max(
+        0.0,
+        min(1.0, team_cs_rate * float(fixture_cs_mult or 1.0)),
+    )
+    pts = expected_points_from_rates(
+        rates,
+        "GK",
+        team_cs_rate=team_cs_rate,
+        appearance=1.0,
+        attack_mult=fixture_attack_mult,
+        cs_mult=fixture_cs_mult,
+    )
+    saves_contrib = (blended_saves / 3.0) * SAVE_POINTS_PER_3
+    return {
+        "rates": rates,
+        "projected_pts": round(float(pts), 3),
+        "saves_pa": round(blended_saves, 3),
+        "saves_contrib": round(saves_contrib, 3),
+        "w_saves_current": round(w_saves, 4),
+        "w_saves_prior": round(1.0 - w_saves, 4),
+        "cs_raw": round(team_cs_rate, 4),
+        "cs_after_fixture": round(cs_after, 4),
+        "personal_prior_cs": (
+            round(float(personal_prior_cs), 4)
+            if personal_prior_cs is not None
+            else None
+        ),
+    }
+
+
 def blend_weights(form_apps: float) -> tuple[float, float]:
     """L6 formunu örneklemle büyüt: 1 maç ~%20, 4 maç ~%30, 6 maç %30."""
     apps = max(0.0, min(float(form_apps or 0.0), 6.0))
@@ -559,8 +647,12 @@ def build_player_table(
 
         cur_apps = float(cur.get("mp") or 0) if cur is not None else 0.0
         prev_apps = float(pr.get("mp") or 0) if pr is not None else 0.0
+        cur_minutes = float(cur.get("minutes") or 0) if cur is not None else 0.0
+        prev_minutes = float(pr.get("minutes") or 0) if pr is not None else 0.0
         current_apps = max(form_apps, cur_apps)
+        current_minutes = max(form_minutes, cur_minutes)
         established_sl = max(prev_apps, cur_apps if cur_apps >= ESTABLISHED_SL_APPS else 0.0)
+        current_sample = effective_match_sample(current_apps, current_minutes)
         cur_rates = _row_rates(cur) if cur is not None else _empty_rates()
         prev_rates = _row_rates(pr) if pr is not None else _empty_rates()
         if cur_rates.get("apps", 0) > 0 and prev_rates.get("apps", 0) > 0:
@@ -644,6 +736,8 @@ def build_player_table(
 
         if form_apps <= 0:
             w_f, w_b = 0.0, 1.0
+        elif current_apps > 0 and current_apps <= EARLY_SEASON_FORM_CAP_APPS:
+            w_f, w_b = 0.0, 1.0
         else:
             w_f, w_b = blend_weights(form_apps)
 
@@ -652,7 +746,9 @@ def build_player_table(
         recent_matches = max(1.0, float(meta.get("form_matches") or 6))
         early = bool(meta.get("early_season", meta.get("preseason")))
         form_from_requested = meta.get("form_season_start") == meta.get("requested_start")
-        if cur_rates.get("apps", 0) > 0 and not current.empty:
+        if current_apps > 0 and current_apps <= EARLY_SEASON_FORM_CAP_APPS:
+            recency_mult = 1.0
+        elif cur_rates.get("apps", 0) > 0 and not current.empty:
             recency_mult = recency_for_projection(
                 form_apps,
                 recent_matches,
@@ -681,12 +777,77 @@ def build_player_table(
         )
         cs_after_fixture = max(0.0, min(1.0, cs_raw * fixture_cs))
         saves_pa = float(show_rates.get("saves_pa") or base_rates.get("saves_pa") or 0.0)
-        saves_contrib = (saves_pa / 3.0) * SAVE_POINTS_PER_3 if position == "GK" else 0.0
+        prior_saves_pa = float(prev_rates.get("saves_pa") or 0.0)
+        current_saves_pa = float(
+            cur_rates.get("saves_pa")
+            or form_rates.get("saves_pa")
+            or 0.0
+        )
+        w_saves_current = 0.0
+        if position == "GK":
+            w_saves_current = season_sample_weight(
+                current_sample, GK_SAVES_PRIOR_MATCHES
+            )
+            if prior_saves_pa > 0 or current_saves_pa > 0:
+                saves_pa = (
+                    w_saves_current * current_saves_pa
+                    + (1.0 - w_saves_current) * (
+                        prior_saves_pa if prior_saves_pa > 0 else current_saves_pa
+                    )
+                )
+                show_rates = {**show_rates, "saves_pa": saves_pa}
+                if current_apps <= EARLY_SEASON_FORM_CAP_APPS and (
+                    prior_saves_pa > 0 or prev_apps >= 1
+                ):
+                    gk_pack = blend_goalkeeper_components(
+                        current_saves_pa=current_saves_pa,
+                        prior_saves_pa=prior_saves_pa if prior_saves_pa > 0 else saves_pa,
+                        current_sample=current_sample,
+                        team_cs=cs_raw,
+                        personal_prior_cs=float(prev_rates.get("cs_rate") or 0.0) or None,
+                        share_60=float(
+                            show_rates.get("share_60")
+                            or base_rates.get("share_60")
+                            or 1.0
+                        ),
+                        min_per_app=float(
+                            show_rates.get("min_per_app")
+                            or base_rates.get("min_per_app")
+                            or 90.0
+                        ),
+                        fixture_attack_mult=fixture_attack,
+                        fixture_cs_mult=fixture_cs,
+                        rating=float(show_rates.get("rating") or base_rates.get("rating") or 0.0),
+                    )
+                    projected = float(gk_pack["projected_pts"]) * recency_mult
+                    saves_pa = float(gk_pack["saves_pa"])
+                    saves_contrib = float(gk_pack["saves_contrib"])
+                    w_saves_current = float(gk_pack["w_saves_current"])
+                    base_pts = float(gk_pack["projected_pts"])
+                else:
+                    saves_contrib = (saves_pa / 3.0) * SAVE_POINTS_PER_3
+            else:
+                saves_contrib = (saves_pa / 3.0) * SAVE_POINTS_PER_3
+        else:
+            saves_contrib = 0.0
+
         reason_bits = []
         if position in ("DF", "GK"):
-            reason_bits.append(f"CS~{cs_after_fixture:.0%} (baz {cs_raw:.0%}, fikstür×{fixture_cs:.2f})")
+            reason_bits.append(
+                f"CS~{cs_after_fixture:.0%} (baz {cs_raw:.0%}, fikstür×{fixture_cs:.2f})"
+            )
             if position == "GK" and saves_pa > 0:
-                reason_bits.append(f"kurtarış ~{saves_pa:.1f}/maç (~{saves_contrib:.2f}p)")
+                if prior_saves_pa > 0 and current_sample > 0:
+                    reason_bits.append(
+                        f"kurtarış ~{saves_pa:.1f}/maç "
+                        f"(current {current_saves_pa:.1f} / prior {prior_saves_pa:.1f}, "
+                        f"ağırlık {w_saves_current:.0%}/{1.0 - w_saves_current:.0%}; "
+                        f"~{saves_contrib:.2f}p)"
+                    )
+                else:
+                    reason_bits.append(
+                        f"kurtarış ~{saves_pa:.1f}/maç (~{saves_contrib:.2f}p)"
+                    )
             if form_rates.get("int_p90", 0) > 0:
                 reason_bits.append(f"Int/90={form_rates['int_p90']:.1f}")
         gls_show = show_rates.get("gls_pa") or 0
@@ -715,7 +876,12 @@ def build_player_table(
         if fixture:
             venue = "iç saha" if fixture.get("home") else "deplasman"
             reason_bits.append(f"{fixture.get('opponent')} ({venue})")
-        reason_bits.append(f"L6 katılım {form_apps:.0f}/{recent_matches:.0f}")
+        if current_apps <= EARLY_SEASON_FORM_CAP_APPS and current_apps > 0:
+            reason_bits.append(
+                f"erken sezon baz ({current_sample:.1f} maç-eş; L6 çift sayım yok)"
+            )
+        else:
+            reason_bits.append(f"L6 katılım {form_apps:.0f}/{recent_matches:.0f}")
         reason_bits.append(f"blend {w_f:.0%}/{w_b:.0%} ({base_src})")
 
         rows.append(
@@ -726,7 +892,9 @@ def build_player_table(
                 "pos_raw": pos_raw,
                 "form_apps": form_apps,
                 "current_apps": current_apps,
+                "current_minutes": current_minutes,
                 "prev_apps": prev_apps,
+                "prev_minutes": prev_minutes,
                 "established_sl_apps": established_sl,
                 "base_apps": base_rates.get("apps", 0.0),
                 "form_pts": round(form_pts, 3),
@@ -746,6 +914,10 @@ def build_player_table(
                 "ast_pa": round(show_rates.get("ast_pa", 0.0) or base_rates.get("ast_pa", 0.0), 3),
                 "xg_pa": round(show_rates.get("xg_pa", 0.0) or base_rates.get("xg_pa", 0.0), 3),
                 "xa_pa": round(show_rates.get("xa_pa", 0.0) or base_rates.get("xa_pa", 0.0), 3),
+                "saves_pa": round(saves_pa, 3),
+                "prior_saves_pa": round(prior_saves_pa, 3),
+                "current_saves_pa": round(current_saves_pa, 3),
+                "w_saves_current": round(w_saves_current, 4) if position == "GK" else 0.0,
                 "share_60": round(show_rates.get("share_60") or base_rates.get("share_60") or 0.0, 3),
                 "min_per_app": round(
                     show_rates.get("min_per_app") or base_rates.get("min_per_app") or 0.0,
