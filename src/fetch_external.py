@@ -768,7 +768,10 @@ def apply_external_priors(
         price = float(r.get("price_m") or 0)
         if price < min_price:
             return False
-        prev_apps = float(r.get("prev_apps") or 0)
+        prev_apps = max(
+            float(r.get("prev_apps") or 0),
+            float(r.get("established_sl_apps") or 0),
+        )
         if prev_apps >= ESTABLISHED_SL_APPS:
             return False
         unmatched = pd.isna(r.get("stats_player")) or not str(r.get("stats_player") or "").strip()
@@ -776,18 +779,13 @@ def apply_external_priors(
             float(r.get("form_apps") or 0),
             float(r.get("current_apps") or 0),
         )
-        sl_apps = prev_apps + current_apps
         sl_minutes = float(r.get("min_per_app") or 0) * max(prev_apps, current_apps, 1.0)
-        if prev_apps >= 4:
-            return False
         if unmatched and prev_apps <= 0:
             return True
         if current_apps >= 4 and sl_minutes >= 240:
             return False
         if unmatched:
             return True
-        if sl_apps >= 4 and sl_minutes >= 240:
-            return False
         return True
 
     mask = df.apply(needs_ext, axis=1)
@@ -855,7 +853,10 @@ def apply_external_priors(
                 progress(f"Dış lig: {done}/{len(jobs)}...")
             if not proj:
                 continue
-            prev_apps = float(df.at[idx, "prev_apps"] or 0) if "prev_apps" in df.columns else 0.0
+            prev_apps = max(
+                float(df.at[idx, "prev_apps"] or 0),
+                float(df.at[idx, "established_sl_apps"] or 0),
+            )
             if prev_apps >= ESTABLISHED_SL_APPS:
                 continue
             current_apps = max(
@@ -870,7 +871,14 @@ def apply_external_priors(
                 sl_minutes = max(sl_minutes, tff_minutes)
                 current_apps = max(current_apps, tff_minutes / 75.0)
                 sl_apps = prev_apps + current_apps
-            if prev_apps >= 4 or (sl_apps >= 8 and sl_minutes >= 480 and sl_pts >= 2.0):
+            if (
+                prev_apps >= ESTABLISHED_SL_APPS
+                or (
+                    sl_apps >= ESTABLISHED_SL_APPS
+                    and sl_minutes >= 480
+                    and sl_pts >= 2.0
+                )
+            ):
                 continue
 
             preserve = {

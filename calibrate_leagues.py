@@ -667,16 +667,22 @@ def evaluate_leagues_forward(
                 identity_errors: list[tuple[float, float]] = []
                 local_errors: list[tuple[float, float]] = []
                 global_errors: list[tuple[float, float]] = []
+                n_valid_rows = 0
                 for year in validation_years:
                     train = data[data["target_season_start"] < year]
                     valid = local[local["target_season_start"] == year]
                     if len(train) < 12 or valid.empty:
                         continue
-                    # Zaman sızıntısı kontrolü: valid yılı train'de yok.
                     assert int(valid["target_season_start"].min()) >= year
                     assert int(train["target_season_start"].max()) < year
                     global_model, locals_ = _fit_family(train, prior, strength)
-                    fitted = locals_.get(int(tid), global_model)
+                    fitted = locals_.get(int(tid))
+                    if (
+                        fitted is None
+                        or float(fitted.get("local_weight") or 0.0) <= 0.0
+                    ):
+                        continue
+                    n_valid_rows += int(len(valid))
                     weight = valid["weight"].to_numpy(float)
                     y = valid["y"].to_numpy(float)
                     x = valid["x"].to_numpy(float)
@@ -708,7 +714,8 @@ def evaluate_leagues_forward(
                 local_mae = _avg(local_errors)
                 global_mae = _avg(global_errors)
                 promote = bool(
-                    local_mae + 1e-12 < identity_mae
+                    n_valid_rows >= 3
+                    and local_mae + 1e-12 < identity_mae
                     and local_mae <= global_mae * 1.02
                 )
                 league_name = str(
@@ -725,7 +732,7 @@ def evaluate_leagues_forward(
                     "local_mae": local_mae,
                     "global_mae": global_mae,
                     "promote": promote,
-                    "n_valid_rows": int(sum(len(local[local["target_season_start"] == y]) for y in validation_years)),
+                    "n_valid_rows": n_valid_rows,
                 }
 
     promoted = 0

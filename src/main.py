@@ -28,17 +28,31 @@ def build_parser() -> argparse.ArgumentParser:
         default="data/weekly_report.png",
         help="Haftalık kadro/fikstür/kart özet PNG dosyası",
     )
-    p.add_argument(
+    card_actions = p.add_mutually_exclusive_group()
+    card_actions.add_argument(
         "--set-cards-remaining",
         type=int,
         default=None,
         help="Sezonluk kalan menajer kart hakkını yerelde güncelle (0-10)",
+    )
+    card_actions.add_argument(
+        "--record-card-used",
+        type=str,
+        default=None,
+        metavar="KART",
+        help="Kullanılan kartı kaydet ve kalan toplam hakkı bir azalt",
     )
     p.add_argument(
         "--weeks-left",
         type=int,
         default=None,
         help="Kart fırsat maliyeti için kalan hafta (isteğe bağlı)",
+    )
+    p.add_argument(
+        "--card-week",
+        type=int,
+        default=None,
+        help="Kaydedilen kartın hafta numarası (isteğe bağlı)",
     )
     p.add_argument(
         "--verbose",
@@ -56,15 +70,39 @@ def main(argv: list[str] | None = None) -> int:
     if args.set_cards_remaining is not None:
         from .manager_cards import set_cards_remaining
 
-        state = set_cards_remaining(
-            args.set_cards_remaining,
-            season=args.season,
-            weeks_left=args.weeks_left,
-        )
+        try:
+            state = set_cards_remaining(
+                args.set_cards_remaining,
+                season=args.season,
+                weeks_left=args.weeks_left,
+            )
+        except ValueError as exc:
+            print(f"HATA: {exc}")
+            return 2
         print(
             f"Kart durumu güncellendi: kalan {state['remaining']}/{state['budget']} "
             f"(sezon {state['season']}, kalan hafta {state['weeks_left']})"
         )
+        return 0
+
+    if args.record_card_used is not None:
+        from .manager_cards import record_card_use
+
+        try:
+            state = record_card_use(
+                args.record_card_used,
+                season=args.season,
+                week=args.card_week,
+                weeks_left=args.weeks_left,
+            )
+        except ValueError as exc:
+            print(f"HATA: {exc}")
+            return 2
+        print(
+            f"Kart kaydedildi: {args.record_card_used}; "
+            f"kalan {state['remaining']}/{state['budget']}"
+        )
+        return 0
 
     from .pipeline import run_cli_pipeline
 

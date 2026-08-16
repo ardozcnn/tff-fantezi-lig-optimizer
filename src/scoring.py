@@ -559,7 +559,6 @@ def build_player_table(
 
         cur_apps = float(cur.get("mp") or 0) if cur is not None else 0.0
         prev_apps = float(pr.get("mp") or 0) if pr is not None else 0.0
-        # Form ve mevcut sezon aynı açılış maçını iki kez saymasın.
         current_apps = max(form_apps, cur_apps)
         established_sl = max(prev_apps, cur_apps if cur_apps >= ESTABLISHED_SL_APPS else 0.0)
         cur_rates = _row_rates(cur) if cur is not None else _empty_rates()

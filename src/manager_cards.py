@@ -60,8 +60,15 @@ def load_card_state(
         remaining = max(0, budget - used)
     state["budget"] = budget
     state["used"] = used
-    state["remaining"] = max(0, int(remaining))
-    state["weeks_left"] = int(state.get("weeks_left") or SEASON_MATCHWEEKS)
+    state["remaining"] = max(0, min(budget, int(remaining)))
+    weeks_left = state.get("weeks_left")
+    state["weeks_left"] = (
+        SEASON_MATCHWEEKS
+        if weeks_left is None
+        else max(0, int(weeks_left))
+    )
+    if not isinstance(state.get("history"), list):
+        state["history"] = []
     if season is not None and int(state.get("season") or 0) != int(season):
         return default_card_state(season)
     return state
@@ -71,14 +78,26 @@ def save_card_state(state: dict[str, Any], path: Path | str | None = None) -> Pa
     target = Path(path) if path else CARD_STATE_FILE
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = dict(state)
-    payload["remaining"] = max(
+    budget = max(0, int(payload.get("budget") or SEASON_CARD_BUDGET))
+    remaining = max(
         0,
-        int(payload.get("remaining", payload.get("budget", SEASON_CARD_BUDGET) - payload.get("used", 0))),
+        min(
+            budget,
+            int(payload.get("remaining", budget - payload.get("used", 0))),
+        ),
     )
-    target.write_text(
+    payload["budget"] = budget
+    payload["remaining"] = remaining
+    payload["used"] = budget - remaining
+    payload["history"] = (
+        payload["history"] if isinstance(payload.get("history"), list) else []
+    )
+    temporary = target.with_suffix(f"{target.suffix}.tmp")
+    temporary.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    temporary.replace(target)
     return target
 
 
@@ -91,9 +110,47 @@ def set_cards_remaining(
 ) -> dict[str, Any]:
     state = load_card_state(path, season=season)
     budget = int(state.get("budget") or SEASON_CARD_BUDGET)
-    left = max(0, min(budget, int(remaining)))
+    left = int(remaining)
+    if not 0 <= left <= budget:
+        raise ValueError(f"Kalan kart sayısı 0-{budget} aralığında olmalı.")
     state["remaining"] = left
     state["used"] = max(0, budget - left)
+    if weeks_left is not None:
+        state["weeks_left"] = max(0, int(weeks_left))
+    if season is not None:
+        state["season"] = int(season)
+    save_card_state(state, path)
+    return state
+
+
+def record_card_use(
+    card: str,
+    *,
+    path: Path | str | None = None,
+    season: int | None = None,
+    week: int | None = None,
+    weeks_left: int | None = None,
+) -> dict[str, Any]:
+    card_name = str(card).strip()
+    if not card_name:
+        raise ValueError("Kaydedilecek kart adı boş olamaz.")
+    state = load_card_state(path, season=season)
+    remaining = int(state.get("remaining") or 0)
+    if remaining <= 0:
+        raise ValueError("Kaydedilecek menajer kartı hakkı kalmadı.")
+    history = list(state.get("history") or [])
+    history.append(
+        {
+            "card": card_name,
+            "week": int(week) if week is not None else None,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    state["history"] = history
+    state["remaining"] = remaining - 1
+    state["used"] = int(state.get("budget") or SEASON_CARD_BUDGET) - int(
+        state["remaining"]
+    )
     if weeks_left is not None:
         state["weeks_left"] = max(0, int(weeks_left))
     if season is not None:

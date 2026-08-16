@@ -1,4 +1,7 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -848,6 +851,49 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(out.loc[0, "data_src"], "super_lig")
         self.assertEqual(float(out.loc[0, "prev_apps"]), 33.0)
 
+    def test_limited_super_lig_history_can_blend_external_prior(self) -> None:
+        from src.fetch_external import apply_external_priors
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "player": "Sınırlı Örnek",
+                    "team": "X",
+                    "position": "MF",
+                    "price_m": 7.0,
+                    "projected_pts": 4.0,
+                    "stats_player": "Sınırlı Örnek",
+                    "form_apps": 1.0,
+                    "current_apps": 1.0,
+                    "prev_apps": 5.0,
+                    "established_sl_apps": 5.0,
+                    "base_apps": 1.0,
+                    "min_per_app": 75.0,
+                    "data_src": "super_lig",
+                }
+            ]
+        )
+        external = {
+            "projected_pts": 6.0,
+            "reason": "dış lig",
+            "data_src": "external_prior",
+        }
+        with (
+            patch(
+                "src.fetch_external.resolve_one",
+                return_value={"player": {"id": 1}},
+            ),
+            patch(
+                "src.fetch_external.project_external_player",
+                return_value=external,
+            ),
+        ):
+            out = apply_external_priors(frame, max_fetch=1)
+
+        self.assertEqual(out.loc[0, "data_src"], "external_blend")
+        self.assertAlmostEqual(float(out.loc[0, "projected_pts"]), 4.9)
+        self.assertEqual(float(out.loc[0, "prev_apps"]), 5.0)
+
     def test_soft_early_form_keeps_strong_super_lig_base(self) -> None:
         from src.scoring import soft_early_form_rates
 
@@ -872,12 +918,10 @@ class ScoringTests(unittest.TestCase):
 
         rows = []
         teams = list("ABCDEFGHIJKLMNO")
-        # 2 GK
         rows += [
             {"player": "GK1", "team": teams[0], "position": "GK", "price_m": 4.0, "pts_if_plays": 4.0, "play_probability": 0.95, "projected_pts": 3.8},
             {"player": "GK2", "team": teams[1], "position": "GK", "price_m": 4.0, "pts_if_plays": 2.0, "play_probability": 0.4, "projected_pts": 0.8},
         ]
-        # 5 DF
         for i in range(5):
             rows.append(
                 {
@@ -890,7 +934,6 @@ class ScoringTests(unittest.TestCase):
                     "projected_pts": 2.8,
                 }
             )
-        # 5 MF
         for i in range(5):
             rows.append(
                 {
@@ -903,7 +946,6 @@ class ScoringTests(unittest.TestCase):
                     "projected_pts": 3.0,
                 }
             )
-        # 3 FW: expensive high-EV third forward should start in 3-FW shapes
         rows += [
             {"player": "Osimhen", "team": "Galatasaray", "position": "FW", "price_m": 14.0, "pts_if_plays": 7.0, "play_probability": 0.95, "projected_pts": 6.6},
             {"player": "Shomu", "team": "Fenerbahce", "position": "FW", "price_m": 10.0, "pts_if_plays": 6.0, "play_probability": 0.95, "projected_pts": 5.7},
@@ -918,6 +960,10 @@ class ScoringTests(unittest.TestCase):
         best = rescore_formations(squad, formations, autosub_draws=80)
         self.assertIn(best["formation"], ("3-4-3", "4-3-3"))
         self.assertIn("Talisca", best["xi"]["player"].tolist())
+        compared = [
+            row["formation"] for row in best["formation_comparisons"]
+        ]
+        self.assertEqual(len(compared), len(set(compared)))
 
     def test_card_budget_raises_threshold_when_rights_are_scarce(self) -> None:
         from src.manager_cards import choose_manager_card, opportunity_threshold
@@ -933,6 +979,68 @@ class ScoringTests(unittest.TestCase):
         )
         self.assertFalse(hold["use"])
         self.assertEqual(hold["remaining"], 2)
+
+    def test_record_card_use_persists_history_and_decrements_total(self) -> None:
+        from src.manager_cards import (
+            load_card_state,
+            record_card_use,
+            set_cards_remaining,
+        )
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "card_state.json"
+            set_cards_remaining(
+                8,
+                path=path,
+                season=2026,
+                weeks_left=30,
+            )
+            state = record_card_use(
+                "Tripleks Kaptan",
+                path=path,
+                season=2026,
+                week=5,
+                weeks_left=29,
+            )
+            loaded = load_card_state(path, season=2026)
+
+        self.assertEqual(state["remaining"], 7)
+        self.assertEqual(state["used"], 3)
+        self.assertEqual(loaded["remaining"], 7)
+        self.assertEqual(loaded["history"][-1]["card"], "Tripleks Kaptan")
+        self.assertEqual(loaded["history"][-1]["week"], 5)
+
+        with TemporaryDirectory() as directory:
+            invalid_path = Path(directory) / "card_state.json"
+            with self.assertRaises(ValueError):
+                set_cards_remaining(11, path=invalid_path, season=2026)
+
+    def test_card_state_cli_does_not_run_weekly_pipeline(self) -> None:
+        from src.main import main
+
+        state = {
+            "remaining": 8,
+            "budget": 10,
+            "season": 2026,
+            "weeks_left": 30,
+        }
+        with patch(
+            "src.manager_cards.set_cards_remaining",
+            return_value=state,
+        ) as update:
+            code = main(
+                [
+                    "--set-cards-remaining",
+                    "8",
+                    "--season",
+                    "2026",
+                    "--weeks-left",
+                    "30",
+                ]
+            )
+
+        self.assertEqual(code, 0)
+        update.assert_called_once()
 
     def test_league_evaluation_promotes_only_better_than_identity(self) -> None:
         from calibrate_leagues import evaluate_leagues_forward
