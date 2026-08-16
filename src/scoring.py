@@ -12,7 +12,10 @@ from .config import (
     AVAIL_MULT,
     BCC_TO_ASSIST,
     CONCEDED_PENALTY_PER_2,
+    COUNT_PRIOR_MATCHES,
+    COUNT_RATE_KEYS,
     CS_POINTS,
+    FORM_PRIOR_MATCHES,
     GOAL_POINTS,
     KEYPASS_TO_ASSIST,
     MIN_60_POINTS,
@@ -22,9 +25,12 @@ from .config import (
     PENALTY_MISS_PENALTY,
     PENALTY_SAVE_POINTS,
     POS_MAP,
+    RARE_PRIOR_MATCHES,
+    RARE_RATE_KEYS,
     RED_PENALTY,
     SAVE_POINTS_PER_3,
     SOT_TO_GOAL,
+    TFF_EARLY_PRIOR_MATCHES,
     W_FORM_DEFAULT,
     YELLOW_PENALTY,
 )
@@ -302,9 +308,12 @@ def expected_points_from_rates(
 
 
 def blend_weights(form_apps: float) -> tuple[float, float]:
-    """L6 formunu örneklemle büyüt: 1 maç %5, 4 maç %20, 6 maç %30."""
+    """L6 formunu örneklemle büyüt: 1 maç ~%20, 4 maç ~%30, 6 maç %30."""
     apps = max(0.0, min(float(form_apps or 0.0), 6.0))
-    form_weight = W_FORM_DEFAULT * apps / 6.0
+    form_weight = min(
+        W_FORM_DEFAULT,
+        apps / (apps + FORM_PRIOR_MATCHES),
+    )
     return form_weight, 1.0 - form_weight
 
 
@@ -326,6 +335,12 @@ def recency_for_projection(
     return _recency_multiplier(form_apps, form_matches)
 
 
+def _metric_prior_matches(key: str) -> float:
+    if key in COUNT_RATE_KEYS:
+        return COUNT_PRIOR_MATCHES
+    return RARE_PRIOR_MATCHES
+
+
 def _blend_rate_sets(
     current: dict[str, float],
     previous: dict[str, float],
@@ -339,17 +354,19 @@ def _blend_rate_sets(
     if previous.get("apps", 0) <= 0:
         return current.copy(), 1.0
 
-    weight = max(0.0, min(1.0, current_apps / (current_apps + prior_matches)))
+    default_weight = max(0.0, min(1.0, current_apps / (current_apps + prior_matches)))
     out: dict[str, float] = {}
     for key in current:
         if key in ("apps", "apps_60"):
             continue
+        key_prior = _metric_prior_matches(key) if prior_matches >= 8 else prior_matches
+        weight = max(0.0, min(1.0, current_apps / (current_apps + key_prior)))
         out[key] = weight * float(current.get(key, 0.0)) + (1.0 - weight) * float(
             previous.get(key, 0.0)
         )
     out["apps"] = current_apps
-    out["apps_60"] = weight * float(current.get("apps_60", 0.0))
-    return out, weight
+    out["apps_60"] = default_weight * float(current.get("apps_60", 0.0))
+    return out, default_weight
 
 
 def _position_prior_rates(position: str) -> dict[str, float]:
@@ -386,6 +403,62 @@ def shrink_small_sample_rates(
         return rates, 1.0
     prior = _position_prior_rates(position)
     return _blend_rate_sets(rates, prior, apps, prior_matches=prior_matches)
+
+
+def estimate_play_probability(row: pd.Series | dict[str, Any]) -> float:
+    """Bu hafta oynama ihtimali: form, TFF dakikası, kullanılabilirlik ve kaleci rotasyonu."""
+    get = row.get if hasattr(row, "get") else lambda k, d=None: row[k] if k in row.index else d
+    status = str(get("availability") or "").strip().upper()
+    if status in {"INJURED", "SUSPENDED", "UNAVAILABLE", "OUT"}:
+        return 0.0
+
+    form_apps = float(get("form_apps") or 0.0)
+    min_per_app = float(get("min_per_app") or 0.0)
+    tff_minutes = float(get("tff_minutes") or 0.0)
+    tff_starts = float(get("tff_starts") or 0.0)
+    fotmob_starts = float(get("fotmob_recent_starts") or 0.0)
+    fotmob_played = float(get("fotmob_recent_played") or 0.0)
+    fotmob_matches = float(get("fotmob_recent_matches") or 0.0)
+    gk_start = float(get("gk_start_probability") or 1.0)
+    position = str(get("position") or "").upper()
+    price_m = float(get("price_m") or 0.0)
+    friendly_min = float(get("friendly_minutes") or 0.0)
+    data_src = str(get("data_src") or "")
+
+    if tff_starts >= 1 or tff_minutes >= 60:
+        base = 0.88 if tff_minutes >= 75 else 0.78
+    elif form_apps >= 4 and min_per_app >= 60:
+        base = 0.90
+    elif form_apps >= 1 and min_per_app >= 45:
+        base = 0.72 + 0.04 * min(form_apps, 4.0)
+    elif fotmob_matches > 0:
+        base = 0.55 + 0.35 * (fotmob_starts / max(fotmob_matches, 1.0))
+        base = max(base, 0.45 + 0.25 * (fotmob_played / max(fotmob_matches, 1.0)))
+    elif data_src == "external_prior":
+        if friendly_min >= 45:
+            base = 0.94 if price_m >= 8 else 0.88
+        elif price_m >= 10:
+            base = 0.93
+        elif price_m >= 8:
+            base = 0.88
+        elif price_m >= 6.5:
+            base = 0.78
+        else:
+            base = 0.62
+    elif min_per_app >= 70:
+        base = 0.80
+    else:
+        base = 0.55
+
+    avail_pct = get("avail_pct")
+    try:
+        avail_pct_f = float(avail_pct) if avail_pct is not None and pd.notna(avail_pct) else None
+    except (TypeError, ValueError):
+        avail_pct_f = None
+    base *= availability_multiplier(status, avail_pct_f)
+    if position == "GK":
+        base *= max(0.05, min(1.0, gk_start))
+    return float(max(0.05, min(0.97, base)))
 
 
 def build_player_table(
@@ -523,6 +596,7 @@ def build_player_table(
             form_for_points,
             position,
             team_form_cs,
+            appearance=1.0,
             attack_mult=fixture_attack,
             cs_mult=fixture_cs,
         )
@@ -530,6 +604,7 @@ def build_player_table(
             base_rates,
             position,
             team_base_cs,
+            appearance=1.0,
             attack_mult=fixture_attack,
             cs_mult=fixture_cs,
         )
@@ -746,10 +821,6 @@ def apply_goalkeeper_start_probabilities(df: pd.DataFrame) -> pd.DataFrame:
         probability = (0.05 + 0.90 * evidence / leader).clip(upper=0.95)
         out.loc[members, "gk_start_probability"] = probability
         out.loc[members, "gk_start_source"] = source
-        out.loc[members, "projected_pts"] = (
-            pd.to_numeric(out.loc[members, "projected_pts"], errors="coerce").fillna(0.0)
-            * probability
-        ).round(3)
 
     return out
 
@@ -785,7 +856,9 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     early_official = (tff_minutes > 0) & (tff_minutes < 900)
     official_weight = official_weight.where(
         ~early_official,
-        (official_apps / (official_apps + 12.0)).clip(lower=0.0, upper=0.25),
+        (official_apps / (official_apps + TFF_EARLY_PRIOR_MATCHES)).clip(
+            lower=0.0, upper=0.35
+        ),
     )
     has_official = (tff_minutes > 0) & ~leftover_full_season
     pts = pts.where(
@@ -793,21 +866,12 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         (1.0 - official_weight) * pts + official_weight * official_ppg,
     )
     out["tff_calibration_weight"] = official_weight.where(has_official, 0.0)
-
-    avail = out["availability"].astype(str) if "availability" in out.columns else None
-    pct = pd.to_numeric(out.get("avail_pct", None), errors="coerce") if "avail_pct" in out.columns else None
-    if avail is not None:
-        mults = []
-        for i, st in avail.items():
-            p = None
-            if pct is not None:
-                v = pct.loc[i] if i in pct.index else None
-                p = float(v) if v is not None and pd.notna(v) else None
-            mults.append(availability_multiplier(st, p))
-        pts = pts * pd.Series(mults, index=pts.index)
-    out["projected_pts"] = pts.round(3)
+    out["pts_if_plays"] = pts.clip(lower=0.0).round(3)
     out = apply_goalkeeper_start_probabilities(out)
-    pts = pd.to_numeric(out["projected_pts"], errors="coerce").fillna(0.0)
+
+    play_probs = out.apply(estimate_play_probability, axis=1)
+    out["play_probability"] = play_probs.round(3)
+    out["projected_pts"] = (out["pts_if_plays"] * out["play_probability"]).round(3)
 
     unavailable = {"INJURED", "SUSPENDED", "UNAVAILABLE", "OUT"}
     status = (
@@ -817,7 +881,6 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     )
     out["selection_eligible"] = ~status.isin(unavailable)
     out["selection_status"] = status.where(status != "", "UNKNOWN")
-    out["projected_pts"] = pts.round(3)
 
     def _note(row: pd.Series) -> str:
         reason = str(row.get("reason") or "")
@@ -836,6 +899,9 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
                 f"ilk 11 olasılığı ~{gk_prob:.0%} "
                 f"({row.get('gk_start_source') or 'kaleci rotasyonu'})"
             )
+        play_p = float(row.get("play_probability") or 1.0)
+        if play_p < 0.95:
+            bits.append(f"oynama ~{play_p:.0%}")
         if bits:
             extra = "; ".join(bits)
             return f"{reason} | {extra}" if reason else extra

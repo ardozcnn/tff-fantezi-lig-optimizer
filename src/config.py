@@ -25,6 +25,39 @@ FORMATIONS: dict[str, dict[str, int]] = {
     "5-2-3": {"GK": 1, "DF": 5, "MF": 2, "FW": 3},
 }
 BENCH_WEIGHT = 0.50
+AUTOSUB_MONTE_CARLO_DRAWS = 256
+
+RARE_RATE_KEYS = (
+    "gls_pa",
+    "ast_pa",
+    "xg_pa",
+    "xa_pa",
+    "cs_rate",
+    "ga_pa",
+    "yc_pa",
+    "rc_pa",
+    "pen_save_pa",
+    "pen_miss_pa",
+    "og_pa",
+)
+COUNT_RATE_KEYS = (
+    "saves_pa",
+    "sot_pa",
+    "shots_pa",
+    "key_passes_pa",
+    "bcc_pa",
+    "int_p90",
+    "tkl_p90",
+    "dribbles_pa",
+    "share_60",
+    "min_per_app",
+    "rating",
+)
+RARE_PRIOR_MATCHES = 10.0
+COUNT_PRIOR_MATCHES = 3.5
+FORM_PRIOR_MATCHES = 4.0
+TFF_EARLY_PRIOR_MATCHES = 6.0
+EXTERNAL_OPENER_PRIOR_MATCHES = 2.5
 
 AVAIL_MULT = {
     "AVAILABLE": 1.0,

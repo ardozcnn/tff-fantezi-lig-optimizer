@@ -7,12 +7,20 @@ from typing import Any
 import pandas as pd
 import pulp
 
-from .config import BENCH_WEIGHT, BUDGET_M, FORMATIONS, MAX_PER_CLUB, SQUAD
+from .autosub import expected_squad_points, order_bench_for_autosub
+from .config import AUTOSUB_MONTE_CARLO_DRAWS, BUDGET_M, FORMATIONS, MAX_PER_CLUB, SQUAD
 from .names import normalize_name
 
 
 def _bench_of(xi: dict[str, int]) -> dict[str, int]:
     return {pos: SQUAD[pos] - xi[pos] for pos in SQUAD}
+
+
+def _selection_value(row: pd.Series) -> float:
+    """ILP için lineer vekil: oynama × puan; yedek için daha düşük."""
+    pts = float(row.get("pts_if_plays") or row.get("projected_pts") or 0.0)
+    play = float(row.get("play_probability") or 0.85)
+    return pts * max(0.05, min(1.0, play))
 
 
 def optimize_squad(
@@ -22,13 +30,14 @@ def optimize_squad(
     max_per_club: int = MAX_PER_CLUB,
     squad: dict[str, int] | None = None,
     formations: dict[str, dict[str, int]] | None = None,
-    bench_weight: float = BENCH_WEIGHT,
+    bench_weight: float | None = None,
+    autosub_draws: int = AUTOSUB_MONTE_CARLO_DRAWS,
     **_ignored: Any,
 ) -> dict[str, Any]:
     """
     15'li kadro: resmi 2-5-5-3.
     İlk 11 dizilişi (4-4-2, 4-5-1, 3-5-2, …) içinden beklenen puanı max olanı seçer.
-    Yedek = kadro − XI (4-5-1 → 2 forvet yedeği vb.).
+    Yedek değeri TFF otomatik değişim beklenen puanıyla hesaplanır.
     """
     squad = squad or SQUAD
     formations = formations or FORMATIONS
@@ -40,12 +49,20 @@ def optimize_squad(
     if df.empty:
         raise ValueError("Optimize edilecek oyuncu yok.")
 
+    if "pts_if_plays" not in df.columns:
+        df["pts_if_plays"] = pd.to_numeric(df["projected_pts"], errors="coerce").fillna(0.0)
+    if "play_probability" not in df.columns:
+        df["play_probability"] = 0.85
+
     for pos, need in squad.items():
         have = int((df["position"] == pos).sum())
         if have < need:
             raise ValueError(
                 f"{pos} için {need} oyuncu gerekiyor, listede {have} var."
             )
+
+    # Yedek lineer vekili: ortalama XI blank × yedek oynama (~0.18-0.28)
+    linear_bench = 0.22 if bench_weight is None else float(bench_weight)
 
     prob = pulp.LpProblem("tff_fantasy_formation", pulp.LpMaximize)
     idxs = list(df.index)
@@ -56,11 +73,11 @@ def optimize_squad(
         for name in formations
     }
 
-    pts = {i: float(df.loc[i, "projected_pts"]) for i in idxs}
+    vals = {i: _selection_value(df.loc[i]) for i in idxs}
     price = {i: float(df.loc[i, "price_m"]) for i in idxs}
 
     prob += pulp.lpSum(
-        start[i] * pts[i] + bench_weight * bench[i] * pts[i] for i in idxs
+        start[i] * vals[i] + linear_bench * bench[i] * vals[i] for i in idxs
     )
     for i in idxs:
         prob += start[i] + bench[i] <= 1, f"one_{i}"
@@ -103,21 +120,27 @@ def optimize_squad(
     bn_idx = [i for i in idxs if bench[i].value() and bench[i].value() > 0.5]
     order = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
 
-    def _sort(frame: pd.DataFrame) -> pd.DataFrame:
+    def _sort_xi(frame: pd.DataFrame) -> pd.DataFrame:
         out = frame.copy()
         out["_o"] = out["position"].map(order)
-        return out.sort_values(["_o", "projected_pts"], ascending=[True, False]).drop(
-            columns=["_o", "team_key"], errors="ignore"
+        out["_v"] = out.apply(_selection_value, axis=1)
+        return out.sort_values(["_o", "_v"], ascending=[True, False]).drop(
+            columns=["_o", "_v", "team_key"], errors="ignore"
         )
 
-    xi_df = _sort(df.loc[xi_idx]).assign(role="XI")
-    bn_df = _sort(df.loc[bn_idx]).assign(role="yedek")
+    xi_df = _sort_xi(df.loc[xi_idx]).assign(role="XI")
+    bn_df = order_bench_for_autosub(df.loc[bn_idx]).assign(role="yedek")
+    if "team_key" in bn_df.columns:
+        bn_df = bn_df.drop(columns=["team_key"], errors="ignore")
     squad_df = pd.concat([xi_df, bn_df], ignore_index=True)
 
+    autosub = expected_squad_points(
+        xi_df,
+        bn_df,
+        draws=autosub_draws,
+    )
     total_cost = float(squad_df["price_m"].sum())
-    xi_pts = float(xi_df["projected_pts"].sum())
-    bn_pts = float(bn_df["projected_pts"].sum())
-    captain_row = xi_df.loc[xi_df["projected_pts"].idxmax()]
+    captain_row = xi_df.loc[xi_df.apply(_selection_value, axis=1).idxmax()]
     bench_shape = _bench_of(formations[chosen])
 
     return {
@@ -129,13 +152,16 @@ def optimize_squad(
         "bench_shape": bench_shape,
         "total_cost": total_cost,
         "bank": budget - total_cost,
-        "total_projected": xi_pts + bn_pts,
-        "xi_projected": xi_pts,
-        "bench_projected": bn_pts,
+        "total_projected": float(autosub["expected_pts"]),
+        "xi_projected": float(autosub["xi_expected"]),
+        "bench_projected": float(autosub["bench_expected"]),
+        "autosub": autosub,
         "captain": {
             "player": captain_row["player"],
             "display_name": str(captain_row.get("display_name") or captain_row["player"]),
-            "projected_pts": float(captain_row["projected_pts"]),
+            "projected_pts": float(captain_row.get("projected_pts") or 0.0),
+            "pts_if_plays": float(captain_row.get("pts_if_plays") or captain_row.get("projected_pts") or 0.0),
+            "play_probability": float(captain_row.get("play_probability") or 0.85),
             "team": captain_row["team"],
             "position": captain_row["position"],
             "price_m": float(captain_row["price_m"]),

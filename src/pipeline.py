@@ -232,11 +232,11 @@ def run_pipeline(
             "bench_shape": result.get("bench_shape") or {},
             "method": (
                 "dakika (60+=2p) + xG/xA + şut/kilit pas + CS/kart/bonus/penaltı; "
-                "mevcut/önceki sezon örnek küçültme; haftalık rakip ve iç/dış saha; "
-                "Sofascore + FotMob ilk 11/xG/güncel maç doğrulaması; "
-                "resmî TFF puan kalibrasyonu; yeni imza son 1–2 lig sezonu ve "
-                "geçmiş lig→SL transferlerinden ileri-zaman doğrulanmış dönüşüm; "
-                "diziliş otomatik (4-4-2/4-5-1/3-5-2…); yedek otomatik giriş."
+                "erken sezon sayım metrikleri daha yüksek, nadir olaylar temkinli; "
+                "oynama olasılığı × oynarsa puan; TFF otomatik yedek EV; "
+                "haftalık rakip ve iç/dış saha; Sofascore + FotMob doğrulaması; "
+                "resmî TFF puan kalibrasyonu; dış lig→SL dönüşüm; "
+                "diziliş otomatik; yedek sırası otomatik girişe göre."
             ),
         }
     )

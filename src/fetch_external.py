@@ -17,6 +17,7 @@ from .league_translation import (
 )
 from .names import best_match, name_variants, normalize_name
 from .scoring import expected_points_from_rates, map_position, rates_from_totals
+from .config import EXTERNAL_OPENER_PRIOR_MATCHES
 
 DOMESTIC_LEAGUES: dict[int, str] = {
     17: "Premier League",
@@ -584,7 +585,7 @@ def project_external_player(
         rates,
         tff_position,
         team_cs_rate=target_cs,
-        appearance=appearance_prior(price_m, rates.get("apps") or 0.0, friendly_min),
+        appearance=1.0,
         attack_mult=fixture_attack_mult,
         cs_mult=fixture_cs_mult,
     )
@@ -840,19 +841,66 @@ def apply_external_priors(
                 continue
             sl_pts = float(df.at[idx, "projected_pts"] or 0)
             sl_apps = float(df.at[idx, "form_apps"] or 0) + float(df.at[idx, "base_apps"] or 0)
+            tff_minutes = float(df.at[idx, "tff_minutes"] or 0) if "tff_minutes" in df.columns else 0.0
             sl_minutes = float(df.at[idx, "min_per_app"] or 0) * sl_apps
+            if tff_minutes > 0:
+                sl_minutes = max(sl_minutes, tff_minutes)
+                sl_apps = max(sl_apps, tff_minutes / 75.0)
             if sl_apps >= 8 and sl_minutes >= 480 and sl_pts >= 2.0:
                 continue
+
+            preserve = {
+                field: df.at[idx, field]
+                for field in (
+                    "form_apps",
+                    "base_apps",
+                    "min_per_app",
+                    "gls_pa",
+                    "ast_pa",
+                    "xg_pa",
+                    "xa_pa",
+                    "team_cs_base",
+                    "fixture_opponent",
+                    "fixture_home",
+                    "fixture_attack_mult",
+                    "fixture_cs_mult",
+                    "form_pts",
+                    "base_pts",
+                    "base_src",
+                    "stats_player",
+                )
+                if field in df.columns and pd.notna(df.at[idx, field]) and str(df.at[idx, field]) not in ("", "nan")
+            }
+            had_sl = sl_apps >= 1 and sl_pts > 0
+
             if sl_apps >= 4 and sl_minutes >= 240 and sl_pts > 0:
                 blended = 0.55 * sl_pts + 0.45 * proj["projected_pts"]
                 proj["projected_pts"] = round(blended, 3)
                 proj["reason"] = (
                     f"SL örnek sınırlı ({sl_apps:.0f} maç) + {proj['reason']}"
                 )
+                proj["data_src"] = "external_blend"
+            elif had_sl:
+                opener_w = min(
+                    0.45,
+                    sl_apps / (sl_apps + EXTERNAL_OPENER_PRIOR_MATCHES),
+                )
+                blended = (1.0 - opener_w) * float(proj["projected_pts"]) + opener_w * sl_pts
+                proj["projected_pts"] = round(blended, 3)
+                proj["reason"] = (
+                    f"SL açılış {sl_apps:.0f} maç ({opener_w:.0%} ağırlık) + {proj['reason']}"
+                )
+                proj["data_src"] = "external_blend"
+
             for k, v in proj.items():
                 if k not in df.columns:
                     df[k] = None
                 df.at[idx, k] = v
+            if had_sl:
+                for field, value in preserve.items():
+                    df.at[idx, field] = value
+                if not str(df.at[idx, "data_src"] or ""):
+                    df.at[idx, "data_src"] = "external_blend"
 
     df["projected_pts"] = pd.to_numeric(df["projected_pts"], errors="coerce").fillna(0.0)
     if progress:

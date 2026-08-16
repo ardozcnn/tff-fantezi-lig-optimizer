@@ -38,11 +38,11 @@ Oyuncular TFF'nin resmî puan kurallarına göre değerlendirilir. Dakika, gol, 
 
 Sezon ve son maç verileri Sofascore'dan alınır; FotMob verileri ilk 11 durumu, xG, xA, şut ve güncel kulüp maçları için ikinci kaynak olarak kullanılır. Haftanın rakibi, iç veya dış saha durumu ve rakibin hücum-savunma gücü de tahmini etkiler.
 
-Sezonun ilk haftalarında tek bir maçın sonucu gereğinden fazla belirleyici olmaz. Yeni sezon verisi, oynanan maç sayısına göre önceki sezonla dengelenir. Bu yöntem özellikle tek maçlık gol, temiz sayfa ve kaleci performanslarının tahmini yapay biçimde yükseltmesini önler.
+Sezonun ilk haftalarında tek bir maçın sonucu gereğinden fazla belirleyici olmaz. Gol ve clean sheet gibi nadir sonuçlar temkinli tutulur; kaleci kurtarışları gibi sayım verileri ise daha hızlı ağırlık kazanır. Yeni sezon verisi, oynanan maç sayısına göre önceki sezonla dengelenir.
 
-Yeni transferlerde son lig sezonları ve mevcutsa hazırlık maçlarındaki dakikalar dikkate alınır. Dış ligden gelen oyuncular için sabit bir katsayı kullanılmaz. Geçmişte Süper Lig'e gelen oyuncuların transfer öncesi ve sonrası dakika başına üretimleriyle lig ve mevki bazında dönüşüm hesaplanır.
+Yeni transferlerde son lig sezonları ve mevcutsa hazırlık maçlarındaki dakikalar dikkate alınır. Dış ligden gelen oyuncular için sabit bir katsayı kullanılmaz. Geçmişte Süper Lig'e gelen oyuncuların transfer öncesi ve sonrası dakika başına üretimleriyle lig ve mevki bazında dönüşüm hesaplanır. Oyuncu Süper Lig'de ilk maçını oynadıysa dış lig tahmini bu açılışla karıştırılır; tamamen silinmez.
 
-Sakat, cezalı veya kadro dışı oyuncular optimizasyona alınmaz. Şüpheli durumdaki oyuncular ise oynama riskine göre daha düşük puanlanır.
+Sakat, cezalı veya kadro dışı oyuncular optimizasyona alınmaz. Şüpheli durumdaki oyuncular ise oynama riskine göre daha düşük puanlanır. Her oyuncu için oynama olasılığı ve oynarsa beklenen puan ayrı tutulur.
 
 ## Kadro seçimi
 
@@ -53,7 +53,7 @@ Optimizasyon şu kurallara uyar:
 - Bir kulüpten en fazla 3 oyuncu
 - Geçerli ilk 11 dizilişlerinden biri
 
-PuLP ile kurulan tamsayı programlama modeli, ilk 11 ve yedek katkısını birlikte değerlendirir. Sonuçta en yüksek beklenen puana sahip yasal kadro, kaptan ve uygun diziliş seçilir.
+PuLP ile kurulan tamsayı programlama modeli yasal kadroyu seçer. İlk 11 ve yedek değeri, TFF'nin otomatik değişiklik kuralına göre hesaplanır: oynamayan bir ilk-11 oyuncusunun yerine, diziliş en az 1 kaleci / 3 defans / 1 forvet kalacak şekilde yedekten sırayla oyuncu girer. Kaleci yalnız kaleciyle değişir. Sonuçta en yüksek beklenen puana sahip yasal kadro, kaptan ve uygun diziliş seçilir.
 
 ## Haftalık rapor ve menajer kartları
 

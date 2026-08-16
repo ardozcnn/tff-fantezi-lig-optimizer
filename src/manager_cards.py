@@ -6,7 +6,8 @@ from typing import Any
 
 import pandas as pd
 
-from .config import BENCH_WEIGHT, BUDGET_M
+from .autosub import expected_squad_points
+from .config import BUDGET_M
 from .optimize import optimize_squad
 
 CARD_USE_THRESHOLDS = {
@@ -38,33 +39,45 @@ def manager_card_advice(
     if not isinstance(bench, pd.DataFrame):
         bench = pd.DataFrame()
 
-    captain_pts = float(captain.get("projected_pts") or 0.0)
-    bench_pts = float(
-        pd.to_numeric(bench.get("projected_pts", pd.Series(dtype=float)), errors="coerce")
-        .fillna(0.0)
-        .sum()
+    captain_pts = float(
+        captain.get("pts_if_plays")
+        or captain.get("projected_pts")
+        or 0.0
     )
+    captain_play = float(captain.get("play_probability") or 0.85)
+    captain_ev = captain_pts * captain_play
+
+    base_ev = expected_squad_points(xi, bench)
+    full_bench_ev = expected_squad_points(xi, bench, full_bench=True)
+    full_bench_extra = max(
+        0.0,
+        float(full_bench_ev["expected_pts"]) - float(base_ev["expected_pts"]),
+    )
+
     advice = [
         {
             "card": "Dört Dörtlük Kaptan",
-            "extra_pts": round(2.0 * captain_pts, 2),
+            "extra_pts": round(2.0 * captain_ev, 2),
             "why": f"{captain.get('display_name') or captain.get('player') or 'Kaptan'} için 4x",
         },
         {
             "card": "Tripleks Kaptan",
-            "extra_pts": round(captain_pts, 2),
+            "extra_pts": round(captain_ev, 2),
             "why": f"{captain.get('display_name') or captain.get('player') or 'Kaptan'} için 3x",
         },
         {
             "card": "Tüm Takım Sahaya",
-            "extra_pts": round((1.0 - BENCH_WEIGHT) * bench_pts, 2),
-            "why": f"4 yedeğin projeksiyonu {bench_pts:.2f}p",
+            "extra_pts": round(full_bench_extra, 2),
+            "why": (
+                f"Otomatik yedek yerine tüm oynayan yedekler "
+                f"+{full_bench_extra:.2f}p"
+            ),
         },
     ]
 
     try:
         attack_result = optimize_squad(available_players, budget=budget + 5.0)
-        normal_total = float(result.get("total_projected") or 0.0)
+        normal_total = float(result.get("total_projected") or base_ev["expected_pts"] or 0.0)
         attack_total = float(attack_result.get("total_projected") or 0.0)
         advice.append(
             {
