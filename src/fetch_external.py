@@ -774,12 +774,21 @@ def apply_external_priors(
         )
         if prev_apps >= ESTABLISHED_SL_APPS:
             return False
-        unmatched = pd.isna(r.get("stats_player")) or not str(r.get("stats_player") or "").strip()
+        unmatched = pd.isna(r.get("stats_player")) or not str(
+            r.get("stats_player") or ""
+        ).strip()
         current_apps = max(
             float(r.get("form_apps") or 0),
             float(r.get("current_apps") or 0),
         )
-        sl_minutes = float(r.get("min_per_app") or 0) * max(prev_apps, current_apps, 1.0)
+        position = str(r.get("position") or "").upper()
+        # Kaleci: tek SL maçındaki CS/kurtarış zaten yüksek sinyal;
+        # Bundesliga geçmişi tek kurtarışlı açılışı şişirmesin.
+        if position == "GK" and not unmatched and current_apps >= 1:
+            return False
+        sl_minutes = float(r.get("min_per_app") or 0) * max(
+            prev_apps, current_apps, 1.0
+        )
         if unmatched and prev_apps <= 0:
             return True
         if current_apps >= 4 and sl_minutes >= 240:
@@ -861,8 +870,13 @@ def apply_external_priors(
                 continue
             current_apps = max(
                 float(df.at[idx, "form_apps"] or 0),
-                float(df.at[idx, "current_apps"] or 0) if "current_apps" in df.columns else 0.0,
+                float(df.at[idx, "current_apps"] or 0)
+                if "current_apps" in df.columns
+                else 0.0,
             )
+            position = str(df.at[idx, "position"] or "").upper()
+            if position == "GK" and current_apps >= 1:
+                continue
             sl_pts = float(df.at[idx, "projected_pts"] or 0)
             sl_apps = prev_apps + current_apps
             tff_minutes = float(df.at[idx, "tff_minutes"] or 0) if "tff_minutes" in df.columns else 0.0

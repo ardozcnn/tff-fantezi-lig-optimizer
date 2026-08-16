@@ -851,6 +851,47 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(out.loc[0, "data_src"], "super_lig")
         self.assertEqual(float(out.loc[0, "prev_apps"]), 33.0)
 
+    def test_goalkeeper_with_super_lig_opener_skips_external_blend(self) -> None:
+        from src.fetch_external import apply_external_priors
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "player": "Alexander Nübel",
+                    "team": "Beşiktaş",
+                    "position": "GK",
+                    "price_m": 5.0,
+                    "projected_pts": 3.26,
+                    "stats_player": "Alexander Nübel",
+                    "form_apps": 1.0,
+                    "current_apps": 1.0,
+                    "prev_apps": 0.0,
+                    "established_sl_apps": 0.0,
+                    "base_apps": 1.0,
+                    "min_per_app": 90.0,
+                    "data_src": "super_lig",
+                }
+            ]
+        )
+        with (
+            patch(
+                "src.fetch_external.resolve_one",
+                return_value={"player": {"id": 1}},
+            ),
+            patch(
+                "src.fetch_external.project_external_player",
+                return_value={
+                    "projected_pts": 6.0,
+                    "reason": "Bundesliga",
+                    "data_src": "external_prior",
+                },
+            ),
+        ):
+            out = apply_external_priors(frame, max_fetch=1)
+
+        self.assertEqual(out.loc[0, "data_src"], "super_lig")
+        self.assertAlmostEqual(float(out.loc[0, "projected_pts"]), 3.26)
+
     def test_limited_super_lig_history_can_blend_external_prior(self) -> None:
         from src.fetch_external import apply_external_priors
 
