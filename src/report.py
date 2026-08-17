@@ -29,11 +29,12 @@ def _name(row: pd.Series) -> str:
     return (disp or full)[:32]
 
 
-def _line(row: pd.Series) -> str:
+def _line(row: pd.Series, *, bench_rank: int | None = None) -> str:
     pos = POS_SHORT.get(str(row["position"]), str(row["position"]))
     team = str(row.get("team") or "")[:20]
     price = float(row.get("price_m") or 0)
-    return f"  {pos}  {_name(row):<28}  {team:<20}  {price:4.1f}M"
+    prefix = f"#{bench_rank} " if bench_rank is not None else "  "
+    return f"{prefix}{pos}  {_name(row):<28}  {team:<20}  {price:4.1f}M"
 
 
 def _bench_label(bshape: dict[str, int]) -> str:
@@ -73,14 +74,16 @@ def print_squad(result: dict[str, Any]) -> None:
             print(_line(r))
     print()
     if btxt:
-        print(f"YEDEKLER ({btxt})")
+        print(f"YEDEKLER ({btxt}) — otomatik giriş sırası")
     else:
-        print("YEDEKLER")
+        print("YEDEKLER — otomatik giriş sırası")
     if bench is None or bench.empty:
         print("  (yok)")
     else:
         for _, r in bench.iterrows():
-            print(_line(r))
+            rank = r.get("bench_rank")
+            bench_rank = int(rank) if pd.notna(rank) else None
+            print(_line(r, bench_rank=bench_rank))
     print()
     cap = result["captain"]
     cap_name = cap.get("display_name") or cap["player"]

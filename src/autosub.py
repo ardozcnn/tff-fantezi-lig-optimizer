@@ -35,6 +35,44 @@ def _row_play_prob(row: pd.Series) -> float:
     return 0.85
 
 
+def _bench_value(row: pd.Series) -> float:
+    return _row_points(row) * _row_play_prob(row)
+
+
+def _pick_bench_replacement(
+    xi_work: pd.DataFrame,
+    bench_work: pd.DataFrame,
+    xi_pos: int,
+    xi_row: pd.Series,
+    used_bench: set[int],
+) -> tuple[int, pd.Series] | None:
+    """Yasal yedekler arasından aynı mevki öncelikli en yüksek EV'yi seç."""
+    out_pos = str(xi_row.get("position") or "").upper()
+    candidates: list[tuple[float, float, int, pd.Series]] = []
+
+    for bn_pos, bn_row in bench_work.iterrows():
+        if bn_pos in used_bench:
+            continue
+        in_pos = str(bn_row.get("position") or "").upper()
+        if out_pos == "GK" and in_pos != "GK":
+            continue
+        if out_pos != "GK" and in_pos == "GK":
+            continue
+        trial_positions = [
+            in_pos if idx == xi_pos else str(row.get("position") or "").upper()
+            for idx, row in xi_work.iterrows()
+        ]
+        if not is_legal_xi(trial_positions):
+            continue
+        same_pos = 1.0 if in_pos == out_pos else 0.0
+        candidates.append((same_pos, _bench_value(bn_row), bn_pos, bn_row))
+
+    if not candidates:
+        return None
+    _, _, bn_pos, bn_row = max(candidates, key=lambda item: (item[0], item[1]))
+    return bn_pos, bn_row
+
+
 def apply_autosub(
     xi: pd.DataFrame,
     bench: pd.DataFrame,
@@ -43,8 +81,8 @@ def apply_autosub(
     """
     Oynamayan ilk-11 oyuncularının yerine yedekleri sırayla dene.
 
-    Kaleci yalnız kaleciyle değişir. Diğer mevkilerde değişim sonrası
-    1 GK / ≥3 DF / ≥1 FW kuralı korunmalıdır.
+    Kaleci yalnız kaleciyle değişir. Sahada aynı mevki yedek varsa önce o
+    tercih edilir; sonra yasal kalan en yüksek oynama×puan adayı seçilir.
     """
     if xi is None or xi.empty:
         return pd.DataFrame(), []
@@ -69,32 +107,28 @@ def apply_autosub(
     for xi_pos, xi_row in xi_work.iterrows():
         if did_play(xi_row):
             continue
+        picked = _pick_bench_replacement(
+            xi_work,
+            bench_work,
+            xi_pos,
+            xi_row,
+            used_bench,
+        )
+        if picked is None:
+            continue
+        bn_pos, bn_row = picked
         out_pos = str(xi_row.get("position") or "").upper()
-        for bn_pos, bn_row in bench_work.iterrows():
-            if bn_pos in used_bench or not did_play(bn_row):
-                continue
-            in_pos = str(bn_row.get("position") or "").upper()
-            if out_pos == "GK" and in_pos != "GK":
-                continue
-            if out_pos != "GK" and in_pos == "GK":
-                continue
-            trial_positions = [
-                in_pos if idx == xi_pos else str(row.get("position") or "").upper()
-                for idx, row in xi_work.iterrows()
-            ]
-            if not is_legal_xi(trial_positions):
-                continue
-            xi_work.loc[xi_pos] = bn_row
-            used_bench.add(bn_pos)
-            events.append(
-                {
-                    "out": str(xi_row.get("display_name") or xi_row.get("player") or ""),
-                    "in": str(bn_row.get("display_name") or bn_row.get("player") or ""),
-                    "out_pos": out_pos,
-                    "in_pos": in_pos,
-                }
-            )
-            break
+        in_pos = str(bn_row.get("position") or "").upper()
+        xi_work.loc[xi_pos] = bn_row
+        used_bench.add(bn_pos)
+        events.append(
+            {
+                "out": str(xi_row.get("display_name") or xi_row.get("player") or ""),
+                "in": str(bn_row.get("display_name") or bn_row.get("player") or ""),
+                "out_pos": out_pos,
+                "in_pos": in_pos,
+            }
+        )
 
     active = xi_work[
         [did_play(row) for _, row in xi_work.iterrows()]
@@ -185,17 +219,18 @@ def expected_squad_points(
 
 
 def order_bench_for_autosub(bench: pd.DataFrame) -> pd.DataFrame:
-    """Otomatik giriş için yedek sırası: kaleci önce, sonra yüksek oynama×puan."""
+    """
+    Otomatik giriş sırası: kaleci yedeği GK için 1., saha yedekleri
+    oynama×puan ile 2-4. Raporda bu sıra gösterilir.
+    """
     if bench is None or bench.empty:
         return pd.DataFrame() if bench is None else bench.copy()
     out = bench.copy()
-    score = out.apply(
-        lambda row: _row_points(row) * _row_play_prob(row),
-        axis=1,
-    )
     out["_gk"] = out["position"].astype(str).str.upper().eq("GK").astype(int)
-    out["_score"] = score
+    out["_score"] = out.apply(_bench_value, axis=1)
     out = out.sort_values(["_gk", "_score"], ascending=[False, False]).drop(
         columns=["_gk", "_score"]
     )
-    return out.reset_index(drop=True)
+    out = out.reset_index(drop=True)
+    out["bench_rank"] = range(1, len(out) + 1)
+    return out

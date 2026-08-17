@@ -1070,6 +1070,9 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     pts = out["raw_pts"].copy()
 
     zeros = pd.Series(0.0, index=out.index)
+    current_apps = pd.to_numeric(
+        out.get("current_apps", zeros), errors="coerce"
+    ).fillna(0.0)
     tff_minutes = pd.to_numeric(out.get("tff_minutes", zeros), errors="coerce").fillna(0.0)
     tff_starts = pd.to_numeric(out.get("tff_starts", zeros), errors="coerce").fillna(0.0)
     tff_points = pd.to_numeric(out.get("tff_points", zeros), errors="coerce").fillna(0.0)
@@ -1087,8 +1090,13 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     official_weight = official_weight.where(
         ~early_official,
         (official_apps / (official_apps + TFF_EARLY_PRIOR_MATCHES)).clip(
-            lower=0.0, upper=0.35
+            lower=0.0, upper=0.45
         ),
+    )
+    thin_current = current_apps <= EARLY_SEASON_FORM_CAP_APPS
+    official_weight = official_weight.where(
+        ~thin_current,
+        official_weight.clip(upper=0.45),
     )
     has_official = (tff_minutes > 0) & ~leftover_full_season
     pts = pts.where(

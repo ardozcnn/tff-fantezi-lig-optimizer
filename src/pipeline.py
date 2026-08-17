@@ -10,10 +10,15 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from .config import BUDGET_M, CACHE_DIR, COOKIE_FILE, DATA_DIR, FORM_MATCHES, PRICES_FILE, is_quiet
+from .config import BUDGET_M, CACHE_DIR, COOKIE_FILE, DATA_DIR, FORM_MATCHES, PRICES_FILE, SEASON_MATCHWEEKS, is_quiet
 from .fetch_external import apply_external_priors
 from .fetch_fotmob import apply_fotmob_validation
-from .fetch_stats import load_dual_season_stats, next_matchweek_fixtures, resolve_season_id
+from .fetch_stats import (
+    estimate_season_weeks_left,
+    load_dual_season_stats,
+    next_matchweek_fixtures,
+    resolve_season_id,
+)
 from .load_prices import load_prices, merge_prices
 from .manager_cards import choose_manager_card, load_card_state, manager_card_advice
 from .names import normalize_name
@@ -193,11 +198,22 @@ def run_pipeline(
         meta.setdefault("notes", []).append(f"Haftalık fikstür alınamadı ({exc}).")
     cards = manager_card_advice(result, eligible, budget=budget)
     card_state = load_card_state(season=int(meta.get("requested_start") or 0) or None)
-    card_decision = choose_manager_card(cards, card_state=card_state)
+    stored_weeks = int(card_state.get("weeks_left") or SEASON_MATCHWEEKS)
+    if stored_weeks >= SEASON_MATCHWEEKS - 1:
+        weeks_for_decision = estimate_season_weeks_left(
+            int(meta.get("requested_start") or 0) or None
+        )
+    else:
+        weeks_for_decision = stored_weeks
+    card_decision = choose_manager_card(
+        cards,
+        card_state=card_state,
+        weeks_left=weeks_for_decision,
+    )
     card_decision["card_state"] = {
         "remaining": card_state.get("remaining"),
         "budget": card_state.get("budget"),
-        "weeks_left": card_state.get("weeks_left"),
+        "weeks_left": weeks_for_decision,
         "season": card_state.get("season"),
     }
     report_path = None

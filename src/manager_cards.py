@@ -166,13 +166,16 @@ def opportunity_threshold(
     weeks_left: int,
     budget: int = SEASON_CARD_BUDGET,
 ) -> float:
-    """Kalan hak / kalan haftaya göre fırsat maliyeti eşiği."""
+    """Kalan hak ve kalan haftaya göre fırsat maliyeti eşiği."""
     if remaining <= 0:
         return float("inf")
-    pace = (SEASON_MATCHWEEKS / max(budget, 1))
-    current = (max(weeks_left, 1) / max(remaining, 1))
-    scarcity = current / max(pace, 1e-9)
-    return float(base) * max(1.0, scarcity)
+    weeks_per_card = max(weeks_left, 1) / max(remaining, 1)
+    even_pace = SEASON_MATCHWEEKS / max(budget, 1)
+    scarcity = weeks_per_card / max(even_pace, 1e-9)
+    deck_ratio = remaining / max(budget, 1)
+    season_remaining = max(weeks_left, 1) / max(SEASON_MATCHWEEKS, 1)
+    patience = 1.0 + 0.55 * deck_ratio * season_remaining
+    return float(base) * max(1.0, scarcity) * patience
 
 
 def manager_card_advice(

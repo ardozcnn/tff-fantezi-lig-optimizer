@@ -79,9 +79,11 @@ class ScoringTests(unittest.TestCase):
         )
         use = choose_manager_card(
             [
-                {"card": "Tripleks Kaptan", "extra_pts": 6.4, "why": "3x"},
+                {"card": "Tripleks Kaptan", "extra_pts": 8.0, "why": "3x"},
                 {"card": "Tüm Takım Sahaya", "extra_pts": 7.0, "why": "bench"},
-            ]
+            ],
+            remaining=4,
+            weeks_left=10,
         )
 
         self.assertFalse(hold["use"])
@@ -744,6 +746,49 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(events[0]["in"], "Bench DF")
         self.assertIn("Bench DF", final_xi["player"].tolist())
 
+    def test_autosub_prefers_same_position_over_higher_scoring_other_line(self) -> None:
+        from src.autosub import apply_autosub
+
+        xi = pd.DataFrame(
+            [
+                {"player": "XI GK", "position": "GK", "pts_if_plays": 4.0},
+                {"player": "DF1", "position": "DF", "pts_if_plays": 3.0},
+                {"player": "DF2", "position": "DF", "pts_if_plays": 3.0},
+                {"player": "DF3", "position": "DF", "pts_if_plays": 3.0},
+                {"player": "MF1", "position": "MF", "pts_if_plays": 3.0},
+                {"player": "MF2", "position": "MF", "pts_if_plays": 3.0},
+                {"player": "MF3", "position": "MF", "pts_if_plays": 3.0},
+                {"player": "MF4", "position": "MF", "pts_if_plays": 3.0},
+                {"player": "MF5", "position": "MF", "pts_if_plays": 3.0},
+                {"player": "FW1", "position": "FW", "pts_if_plays": 3.0},
+                {"player": "FW2", "position": "FW", "pts_if_plays": 3.0},
+            ]
+        )
+        bench = pd.DataFrame(
+            [
+                {"player": "Bench FW", "position": "FW", "pts_if_plays": 8.0},
+                {"player": "Bench DF", "position": "DF", "pts_if_plays": 4.0},
+            ]
+        )
+        played = {p: p != "DF1" for p in list(xi["player"]) + list(bench["player"])}
+        _final_xi, events = apply_autosub(xi, bench, played=played)
+        self.assertEqual(events[0]["in"], "Bench DF")
+
+    def test_bench_order_shows_autosub_rank(self) -> None:
+        from src.autosub import order_bench_for_autosub
+
+        bench = pd.DataFrame(
+            [
+                {"player": "Yedek FW", "position": "FW", "pts_if_plays": 5.0, "play_probability": 0.8},
+                {"player": "Yedek KL", "position": "GK", "pts_if_plays": 3.0, "play_probability": 0.7},
+                {"player": "Yedek OS", "position": "MF", "pts_if_plays": 4.0, "play_probability": 0.9},
+            ]
+        )
+        ordered = order_bench_for_autosub(bench)
+        self.assertEqual(int(ordered.iloc[0]["bench_rank"]), 1)
+        self.assertEqual(str(ordered.iloc[0]["position"]), "GK")
+        self.assertEqual(list(ordered["bench_rank"]), [1, 2, 3])
+
     def test_expected_squad_points_rewards_useful_bench_cover(self) -> None:
         from src.autosub import expected_squad_points
 
@@ -920,7 +965,6 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(out.loc[0, "data_src"], "external_blend")
         self.assertEqual(float(out.loc[0, "ext_saves"]), 109)
         self.assertEqual(float(out.loc[0, "ext_cs"]), 11)
-        # 1 maç: w_current = 1/5 = 0.2 → 0.2*1 + 0.8*3 = 2.6
         self.assertAlmostEqual(float(out.loc[0, "saves_pa"]), 2.6, places=3)
         self.assertLess(float(out.loc[0, "projected_pts"]), 6.0)
         self.assertGreater(float(out.loc[0, "projected_pts"]), 3.26)
@@ -979,7 +1023,6 @@ class ScoringTests(unittest.TestCase):
         self.assertGreater(sengezer["saves_pa"], 3.0)
         self.assertAlmostEqual(nubel["personal_prior_cs"], 11 / 33, places=4)
         self.assertAlmostEqual(sengezer["personal_prior_cs"], 12 / 33, places=4)
-        # CS puanı kişisel Bundesliga/SL CS'den değil takım+fikstürden gelir.
         self.assertAlmostEqual(nubel["cs_raw"], 0.40, places=4)
         self.assertAlmostEqual(sengezer["cs_raw"], 0.43, places=4)
         self.assertLess(sengezer["cs_after_fixture"], sengezer["cs_raw"])
@@ -1105,6 +1148,10 @@ class ScoringTests(unittest.TestCase):
             opportunity_threshold(6.0, remaining=2, weeks_left=20),
             opportunity_threshold(6.0, remaining=10, weeks_left=34),
         )
+        self.assertGreater(
+            opportunity_threshold(6.0, remaining=10, weeks_left=34),
+            opportunity_threshold(6.0, remaining=10, weeks_left=12),
+        )
         hold = choose_manager_card(
             [{"card": "Tripleks Kaptan", "extra_pts": 6.4, "why": "3x"}],
             remaining=2,
@@ -1112,6 +1159,12 @@ class ScoringTests(unittest.TestCase):
         )
         self.assertFalse(hold["use"])
         self.assertEqual(hold["remaining"], 2)
+        early_hold = choose_manager_card(
+            [{"card": "Tripleks Kaptan", "extra_pts": 6.4, "why": "3x"}],
+            remaining=10,
+            weeks_left=33,
+        )
+        self.assertFalse(early_hold["use"])
 
     def test_record_card_use_persists_history_and_decrements_total(self) -> None:
         from src.manager_cards import (

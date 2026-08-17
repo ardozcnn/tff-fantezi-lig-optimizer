@@ -1121,3 +1121,36 @@ def load_dual_season_stats(
         "current_season_df": current_season,
         "fixture_context": fixture_context,
     }
+
+
+def estimate_season_weeks_left(year_start: int | None = None) -> int:
+    """Tamamlanan maç haftasına göre sezon sonuna kalan hafta tahmini."""
+    from .config import SEASON_MATCHWEEKS
+
+    year = int(year_start or discover_current_season_start())
+    try:
+        from .fetch_fotmob import _get_json
+
+        label = f"{year}/{year + 1}"
+        data = _get_json(
+            f"leagues?id=71&season={label}",
+            f"weeks_left_{year % 100:02d}",
+            12.0,
+        )
+        rows = ((data.get("fixtures") or {}).get("allMatches")) or []
+        by_round: dict[int, list[bool]] = {}
+        for row in rows:
+            try:
+                rnd = int(str(row.get("round") or row.get("roundName") or 0))
+            except (TypeError, ValueError):
+                continue
+            if rnd <= 0:
+                continue
+            finished = bool((row.get("status") or {}).get("finished"))
+            by_round.setdefault(rnd, []).append(finished)
+        if not by_round:
+            return SEASON_MATCHWEEKS
+        completed = sum(1 for fins in by_round.values() if fins and all(fins))
+        return max(1, SEASON_MATCHWEEKS - completed)
+    except Exception:
+        return SEASON_MATCHWEEKS

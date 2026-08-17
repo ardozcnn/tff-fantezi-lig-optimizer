@@ -8,7 +8,7 @@ installed by the startup update script (`pip install -r requirements.txt`). Stan
 commands live in `README.md` and `calistir.bat`.
 
 ### Services / commands
-- Tests (offline, no network): `python3 -m unittest discover -s tests -v` (15 unittest cases; no live APIs).
+- Tests (offline, no network): `python3 -m unittest discover -s tests -v` (no live APIs required for the suite).
 - Run the app: `python3 -m src.main` (flags documented in `README.md`).
 - No linter/formatter and no CI are configured — there is nothing to run for lint.
 
