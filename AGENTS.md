@@ -24,8 +24,11 @@ commands live in `README.md` and `calistir.bat`.
   past price-fetching, not the stats step.
 - To exercise the core ILP optimizer (`src/optimize.py`) + report (`src/report.py`) without network,
   feed `optimize_squad` a DataFrame with columns `player, display_name, team, position, price_m,
-  projected_pts`. It enforces TFF rules (100M budget, 2 GK / 5 DF / 5 MF / 3 FW, max 3 per club) and
+  projected_pts`. Optional `selection_pts` is the 3-week horizon used for squad picking; captain and
+  autosub still use this-week `pts_if_plays`. It enforces TFF rules (100M budget, 2 GK / 5 DF / 5 MF / 3 FW, max 3 per club) and
   auto-picks formation + XI + bench + captain via PuLP/CBC (CBC ships with PuLP).
+- Match strength lives in `src/team_model.py` (Poisson attack/defence, no JAX). It feeds fixture
+  multipliers and player goal-share inside `src/scoring.py`; there is no standalone score predictor.
 - `calibrate_leagues.py` (offline maintenance) imports `numpy`, which is **not** pinned in
   `requirements.txt` (usually present transitively via pandas). Not needed for normal squad runs —
   the calibrated model `data/league_translation.json` is already committed.

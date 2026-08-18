@@ -255,6 +255,7 @@ def run_pipeline(
             "bench_shape": result.get("bench_shape") or {},
             "method": (
                 "dakika (60+=2p) + xG/xA + şut/kilit pas + CS/kart/bonus/penaltı; "
+                "Poisson takım hücum/savunma ile oyuncu gol payı; 3 haftalık ufuk; "
                 "erken sezon sayım metrikleri daha yüksek, nadir olaylar temkinli; "
                 "oynama olasılığı × oynarsa puan; TFF otomatik yedek EV; "
                 "haftalık rakip ve iç/dış saha; Sofascore + FotMob doğrulaması; "

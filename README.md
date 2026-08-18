@@ -37,6 +37,8 @@ python -m src.main --report-png data/weekly_report.png
 
 Fiyatları çevrimdışı denemek için `data/prices.example.csv` dosyasını `data/prices.csv` olarak kopyalayıp `--no-fetch-prices` bayrağını kullanabilirsiniz. İstatistik adımı yine Sofascore’dan veri ister.
 
+Sofascore ara sıra 403/429 ile geçici engel koyar. Program önce farklı tarayıcı kimlikleriyle ve kısa aralarla tekrar dener; olmazsa bir önceki başarılı çekimin önbelleğini kullanır. `--refresh-cache` bu yedeği siler, engel anında çalıştırmayın. Fikstür Sofascore’dan gelmezse FotMob takvimi devreye girer. 10–20 dakika sonra yeniden denemek genelde yeterlidir.
+
 ## Analiz neye dayanıyor?
 
 Her hafta birkaç kaynak birlikte okunur:
@@ -47,7 +49,7 @@ Her hafta birkaç kaynak birlikte okunur:
 
 **Resmî TFF puanları** — TFF’deki dakika, maç sayısı ve maç başı puan, özellikle sezonun ilk haftalarında modeli kalibre eder.
 
-**Fikstür** — Haftanın rakibi, iç veya dış saha ile rakip takımın hücum-savunma gücü beklenen puana yansır.
+**Fikstür** — Haftanın rakibi, iç veya dış saha ile rakip takımın hücum-savunma gücü beklenen puana yansır. Güç, geçmiş maç skorlarından Poisson modeliyle tahmin edilir; oyuncunun gol/asist payı bu maç beklentisine bağlanır. Kadro seçiminde bu hafta ağır basar, sonraki iki rakip daha düşük ağırlıkla eklenir. Kaptan ve otomatik yedek hâlâ yalnızca bu haftaya bakar.
 
 **Yedek sırası** — TFF’nin otomatik değişik kuralına göre hesaplanır: aynı mevkideki yedek önce gelir, ardından oynama olasılığı × beklenen puan en yüksek olan tercih edilir.
 

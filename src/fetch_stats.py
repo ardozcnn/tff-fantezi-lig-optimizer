@@ -19,11 +19,21 @@ from .config import (
     FIXTURE_CS_CEILING,
     FIXTURE_CS_FLOOR,
     FORM_MATCHES,
+    HORIZON_WEEKS,
     REQUEST_DELAY_S,
     TEAM_CS_PRIOR_MATCHES,
     is_quiet,
 )
 from .names import normalize_name
+from .team_model import (
+    PREV_SEASON_WEIGHT,
+    blend_ratings,
+    fixture_pack,
+    fit_poisson_ratings,
+    group_events_by_matchweek,
+    matches_from_events,
+    ratings_from_standings,
+)
 
 
 def _log(msg: str) -> None:
@@ -112,27 +122,31 @@ def _save_cache(key: str, payload: Any) -> None:
 
 def _sofa_fetch(url: str, delay: float) -> Any:
     last_error: Exception | None = None
-    for profile in _IMPERSONATE_PROFILES:
-        _throttle(delay)
-        try:
-            resp = _get_session(profile).get(
-                url,
-                headers=_SOFA_HEADERS,
-                timeout=45,
-                verify=_ssl_verify(),
-            )
-        except Exception as exc:
-            last_error = exc
-            continue
-        if resp.status_code == 404:
-            raise SofaNotFound(url)
-        if resp.status_code in (403, 429, 503):
-            last_error = RuntimeError(f"Sofascore {resp.status_code}: {url}")
-            continue
-        if resp.status_code != 200:
-            last_error = RuntimeError(f"Sofascore {resp.status_code}: {url}")
-            continue
-        return resp.json()
+    waits = (delay, max(delay, 1.6), max(delay, 4.0))
+    for wait in waits:
+        for profile in _IMPERSONATE_PROFILES:
+            _throttle(wait)
+            try:
+                resp = _get_session(profile).get(
+                    url,
+                    headers=_SOFA_HEADERS,
+                    timeout=45,
+                    verify=_ssl_verify(),
+                )
+            except Exception as exc:
+                last_error = exc
+                continue
+            if resp.status_code == 404:
+                raise SofaNotFound(url)
+            if resp.status_code in (403, 429, 503):
+                last_error = RuntimeError(f"Sofascore {resp.status_code}: {url}")
+                continue
+            if resp.status_code != 200:
+                last_error = RuntimeError(f"Sofascore {resp.status_code}: {url}")
+                continue
+            global _sofa_blocked
+            _sofa_blocked = False
+            return resp.json()
     if last_error:
         raise last_error
     raise RuntimeError(f"Sofascore istek başarısız: {url}")
@@ -166,6 +180,7 @@ def sofa_get(path: str, *, cache_key: str | None = None, max_age_hours: float = 
         stale = _load_cache(cache_key, max_age_hours=None)
         if stale is not None:
             if not _stale_cache_warned:
+                _log("Sofascore geçici engel; kayıtlı önbellek kullanılıyor. 10-20 dk sonra tekrar deneyin.")
                 warnings.warn(
                     "Sofascore geçici olarak engelli; kayıtlı önbellek kullanılıyor.",
                     stacklevel=2,
@@ -254,7 +269,7 @@ def fetch_standings_rows(season_id: int) -> list[dict[str, Any]]:
     return rows
 
 
-def fetch_upcoming_events(season_id: int, max_pages: int = 2) -> list[dict[str, Any]]:
+def fetch_upcoming_events(season_id: int, max_pages: int = 4) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for page in range(max_pages):
         try:
@@ -310,7 +325,7 @@ def build_fixture_context(
     fallback_strength_season_id: int | None = None,
     prefer_fallback: bool = False,
 ) -> dict[str, dict[str, Any]]:
-    """İlk gelecek maç + rakibin sezon hücum/savunma gücü."""
+    """Gelecek 3 maç haftası + Poisson hücum/savunma (standings yedek)."""
     primary_id = (
         fallback_strength_season_id
         if prefer_fallback and fallback_strength_season_id
@@ -331,46 +346,94 @@ def build_fixture_context(
     for row in rows:
         team = row.get("team") or {}
         key = normalize_name(str(team.get("name") or ""))
-        matches = float(row.get("matches") or 0)
-        if not key or matches <= 0:
+        matches_n = float(row.get("matches") or 0)
+        if not key or matches_n <= 0:
             continue
         gf = float(row.get("scoresFor") or 0)
         ga = float(row.get("scoresAgainst") or 0)
-        metrics[key] = {"gf": gf / matches, "ga": ga / matches}
+        metrics[key] = {"gf": gf / matches_n, "ga": ga / matches_n}
         total_goals += gf
-        total_matches += matches
+        total_matches += matches_n
 
     league_goal_rate = total_goals / total_matches if total_matches else 1.35
-    events = fetch_upcoming_events(upcoming_season_id)
+    standings_ratings = ratings_from_standings(metrics, league_goal_rate=league_goal_rate)
+
+    model_matches: list[dict[str, Any]] = []
+    try:
+        current_events = fetch_recent_events(strength_season_id, max_pages=8)
+        model_matches.extend(matches_from_events(current_events, season_boost=1.0))
+    except Exception:
+        current_events = []
+    if fallback_strength_season_id and fallback_strength_season_id != strength_season_id:
+        try:
+            prev_events = fetch_recent_events(fallback_strength_season_id, max_pages=6)
+            model_matches.extend(
+                matches_from_events(prev_events, season_boost=PREV_SEASON_WEIGHT)
+            )
+        except Exception:
+            pass
+    poisson = fit_poisson_ratings(model_matches)
+    current_n = sum(1 for m in model_matches if float(m.get("weight") or 0) >= 0.6)
+    if prefer_fallback:
+        ratings = blend_ratings(poisson, standings_ratings, current_weight=0.28)
+    elif poisson.get("source") == "poisson":
+        blend_w = min(0.85, 0.25 + current_n / 80.0)
+        ratings = blend_ratings(poisson, standings_ratings, current_weight=blend_w)
+    else:
+        ratings = standings_ratings if standings_ratings.get("attack") else poisson
+
+    events = fetch_upcoming_events(upcoming_season_id, max_pages=4)
+    if not events:
+        try:
+            from .fetch_fotmob import fetch_upcoming_super_lig_events
+
+            events = fetch_upcoming_super_lig_events()
+            if events:
+                _log("Sofascore fikstür boş/engelli; FotMob fikstürü kullanılıyor.")
+        except Exception:
+            events = []
+    weeks = group_events_by_matchweek(events, weeks=HORIZON_WEEKS)
     context: dict[str, dict[str, Any]] = {}
 
-    def add(team: str, opponent: str, home: bool) -> None:
-        key = normalize_name(team)
-        if not key or key in context:
-            return
-        opp = metrics.get(normalize_name(opponent))
-        if opp:
-            opponent_defence = opp["ga"] / league_goal_rate
-            opponent_attack = opp["gf"] / league_goal_rate
-        else:
-            opponent_defence = opponent_attack = 1.0
-        attack_mult = opponent_defence * (1.06 if home else 0.94)
-        cs_mult = (1.0 / max(opponent_attack, 0.55)) * (1.08 if home else 0.92)
-        context[key] = {
-            "opponent": opponent,
-            "home": home,
-            "attack_mult": max(0.78, min(1.22, attack_mult)),
-            "cs_mult": max(FIXTURE_CS_FLOOR, min(FIXTURE_CS_CEILING, cs_mult)),
-        }
+    def pack_event(team: str, opponent: str, home: bool) -> dict[str, Any]:
+        pack = fixture_pack(ratings, team, opponent, home=home)
+        if not pack.get("attack_mult"):
+            opp = metrics.get(normalize_name(opponent))
+            if opp:
+                opponent_defence = opp["ga"] / league_goal_rate
+                opponent_attack = opp["gf"] / league_goal_rate
+            else:
+                opponent_defence = opponent_attack = 1.0
+            pack["attack_mult"] = max(0.78, min(1.22, opponent_defence * (1.06 if home else 0.94)))
+            pack["cs_mult"] = max(
+                FIXTURE_CS_FLOOR,
+                min(
+                    FIXTURE_CS_CEILING,
+                    (1.0 / max(opponent_attack, 0.55)) * (1.08 if home else 0.92),
+                ),
+            )
+        return pack
 
-    for event in events:
-        home = str((event.get("homeTeam") or {}).get("name") or "")
-        away = str((event.get("awayTeam") or {}).get("name") or "")
-        if home and away:
-            add(home, away, True)
-            add(away, home, False)
-        if len(context) >= 18:
-            break
+    for week_idx, bucket in enumerate(weeks):
+        for event in bucket:
+            home = str((event.get("homeTeam") or {}).get("name") or "")
+            away = str((event.get("awayTeam") or {}).get("name") or "")
+            if not home or not away:
+                continue
+            for team, opponent, is_home in ((home, away, True), (away, home, False)):
+                key = normalize_name(team)
+                if not key:
+                    continue
+                pack = pack_event(team, opponent, is_home)
+                pack["week"] = week_idx
+                if key not in context:
+                    context[key] = {**pack, "horizon": [pack]}
+                else:
+                    horizon = list(context[key].get("horizon") or [])
+                    if len(horizon) <= week_idx:
+                        horizon.append(pack)
+                        context[key]["horizon"] = horizon
+
     return context
 
 
@@ -1111,7 +1174,8 @@ def load_dual_season_stats(
                 else f"mevcut sezon güç ({season_label(current_start)})"
             )
             meta["notes"].append(
-                f"Haftalık rakip/iç-dış saha: {len(fixture_context)} takım; {strength_note}."
+                f"Haftalık rakip/iç-dış saha: {len(fixture_context)} takım; "
+                f"{strength_note}; Poisson hücum/savunma + 3 haftalık ufuk."
             )
     except Exception as exc:
         meta["notes"].append(f"Fikstür etkisi alınamadı ({exc}); nötr rakip varsayıldı.")

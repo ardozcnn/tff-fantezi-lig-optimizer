@@ -474,3 +474,56 @@ def apply_fotmob_validation(
         hot_n = int(pd.to_numeric(out.get("fotmob_hot_weight"), errors="coerce").fillna(0).gt(0).sum()) if "fotmob_hot_weight" in out.columns else 0
         progress(f"FotMob doğrulaması: {count} oyuncu" + (f", {hot_n} hot-form blend." if hot_n else "."))
     return out
+
+
+def _fotmob_side_name(side: Any) -> str:
+    if isinstance(side, str):
+        return side
+    if not isinstance(side, dict):
+        return ""
+    return str(side.get("name") or side.get("longName") or side.get("shortName") or "")
+
+
+def fotmob_rows_to_sofa_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for row in rows or []:
+        status = row.get("status") if isinstance(row.get("status"), dict) else {}
+        if status.get("finished"):
+            continue
+        home = _fotmob_side_name(row.get("home") or row.get("homeTeam"))
+        away = _fotmob_side_name(row.get("away") or row.get("awayTeam"))
+        if not home or not away:
+            continue
+        raw = str(
+            status.get("utcTime")
+            or (row.get("matchDate") or {}).get("utcTime")
+            or row.get("utcTime")
+            or ""
+        )
+        stamp = 0
+        if raw:
+            try:
+                stamp = int(datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp())
+            except ValueError:
+                stamp = 0
+        events.append(
+            {
+                "startTimestamp": stamp,
+                "homeTeam": {"name": home},
+                "awayTeam": {"name": away},
+            }
+        )
+    events.sort(key=lambda e: int(e.get("startTimestamp") or 0))
+    return events
+
+
+def fetch_upcoming_super_lig_events(year_start: int | None = None) -> list[dict[str, Any]]:
+    year = int(year_start or datetime.now(timezone.utc).year)
+    label = f"{year}/{year + 1}"
+    data = _get_json(
+        f"leagues?id=71&season={label}",
+        f"fixtures_{year % 100:02d}",
+        6.0,
+    )
+    rows = ((data.get("fixtures") or {}).get("allMatches")) or []
+    return fotmob_rows_to_sofa_events(rows)

@@ -22,6 +22,7 @@ from .config import (
     FORM_PRIOR_MATCHES,
     GK_SAVES_PRIOR_MATCHES,
     GOAL_POINTS,
+    HORIZON_WEIGHTS,
     KEYPASS_TO_ASSIST,
     MIN_60_POINTS,
     MIN_FORM_MINUTES_FOR_RATES,
@@ -40,6 +41,7 @@ from .config import (
     YELLOW_PENALTY,
 )
 from .names import normalize_name
+from .team_model import blend_cs_probability, blend_goal_expectation
 
 
 def map_position(pos: str | float | None) -> str | None:
@@ -233,6 +235,11 @@ def expected_points_from_rates(
     appearance: float | None = None,
     attack_mult: float = 1.0,
     cs_mult: float = 1.0,
+    save_mult: float = 1.0,
+    lambda_for: float | None = None,
+    lambda_against: float | None = None,
+    p_cs: float | None = None,
+    team_goal_rate: float | None = None,
 ) -> float:
     """Bir maçlık beklenen TFF fantezi puanı (dakika, xG/xA, CS, kart, bonus, penaltı)."""
     if not rates or rates.get("apps", 0) <= 0:
@@ -258,14 +265,32 @@ def expected_points_from_rates(
         rates.get("xa_pa") or 0.0,
         max(kp_proxy, bcc_proxy),
     )
-    goal_pts = appearance * exp_gls * GOAL_POINTS[pos] * attack_mult
-    assist_pts = appearance * exp_ast * ASSIST_POINTS * attack_mult
+    adj_gls = blend_goal_expectation(
+        exp_gls,
+        attack_mult=attack_mult,
+        lambda_for=lambda_for,
+        team_goal_rate=team_goal_rate,
+    )
+    adj_ast = blend_goal_expectation(
+        exp_ast,
+        attack_mult=attack_mult,
+        lambda_for=lambda_for,
+        team_goal_rate=team_goal_rate,
+    )
+    goal_pts = appearance * adj_gls * GOAL_POINTS[pos]
+    assist_pts = appearance * adj_ast * ASSIST_POINTS
 
-    cs_rate = team_cs_rate if team_cs_rate is not None else rates.get("cs_rate", 0.0)
-    cs_rate = max(0.0, min(1.0, cs_rate * cs_mult))
+    raw_cs = team_cs_rate if team_cs_rate is not None else rates.get("cs_rate", 0.0)
+    cs_rate = blend_cs_probability(
+        float(raw_cs or 0.0),
+        cs_mult=cs_mult,
+        p_cs=p_cs,
+    )
     if pos in ("GK", "DF"):
         cs_pts = appearance * cs_rate * share_60 * CS_POINTS[pos]
-        if team_cs_rate is not None:
+        if lambda_against is not None:
+            ga_pa = float(lambda_against)
+        elif team_cs_rate is not None:
             ga_pa = -math.log(max(0.03, min(0.97, cs_rate)))
         else:
             ga_pa = rates.get("ga_pa") or (1.0 - cs_rate) * 1.2
@@ -284,7 +309,12 @@ def expected_points_from_rates(
 
     save_pts = 0.0
     if pos == "GK":
-        save_pts = appearance * (rates.get("saves_pa", 0.0) / 3.0) * SAVE_POINTS_PER_3
+        save_pts = (
+            appearance
+            * (rates.get("saves_pa", 0.0) / 3.0)
+            * SAVE_POINTS_PER_3
+            * float(save_mult or 1.0)
+        )
         save_pts += appearance * (rates.get("pen_save_pa") or 0.0) * PENALTY_SAVE_POINTS
 
     card_pen = appearance * (
@@ -359,6 +389,11 @@ def blend_goalkeeper_components(
     fixture_attack_mult: float = 1.0,
     fixture_cs_mult: float = 1.0,
     rating: float = 0.0,
+    save_mult: float = 1.0,
+    lambda_for: float | None = None,
+    lambda_against: float | None = None,
+    p_cs: float | None = None,
+    team_goal_rate: float | None = None,
 ) -> dict[str, Any]:
     """
     Kaleci: kurtarış kişisel prior+current harmanı; CS puanı takım oranından.
@@ -388,9 +423,10 @@ def blend_goalkeeper_components(
         "pen_miss_pa": 0.0,
         "og_pa": 0.0,
     }
-    cs_after = max(
-        0.0,
-        min(1.0, team_cs_rate * float(fixture_cs_mult or 1.0)),
+    cs_after = blend_cs_probability(
+        team_cs_rate,
+        cs_mult=float(fixture_cs_mult or 1.0),
+        p_cs=p_cs,
     )
     pts = expected_points_from_rates(
         rates,
@@ -399,8 +435,13 @@ def blend_goalkeeper_components(
         appearance=1.0,
         attack_mult=fixture_attack_mult,
         cs_mult=fixture_cs_mult,
+        save_mult=save_mult,
+        lambda_for=lambda_for,
+        lambda_against=lambda_against,
+        p_cs=p_cs,
+        team_goal_rate=team_goal_rate,
     )
-    saves_contrib = (blended_saves / 3.0) * SAVE_POINTS_PER_3
+    saves_contrib = (blended_saves / 3.0) * SAVE_POINTS_PER_3 * float(save_mult or 1.0)
     return {
         "rates": rates,
         "projected_pts": round(float(pts), 3),
@@ -709,29 +750,23 @@ def build_player_table(
         team_form_cs = _lookup_cs(squad, form_cs)
         team_base_cs = _lookup_cs(squad, base_cs)
         fixture = lookup_fixture_context(squad, fixture_context)
-        fixture_attack = float(fixture.get("attack_mult") or 1.0)
-        fixture_cs = float(
-            max(
-                FIXTURE_CS_FLOOR,
-                min(FIXTURE_CS_CEILING, float(fixture.get("cs_mult") or 1.0)),
-            )
-        )
+        fx_kwargs = fixture_model_kwargs(fixture)
+        fixture_attack = float(fx_kwargs["attack_mult"])
+        fixture_cs = float(fx_kwargs["cs_mult"])
 
         form_pts = expected_points_from_rates(
             form_for_points,
             position,
             team_form_cs,
             appearance=1.0,
-            attack_mult=fixture_attack,
-            cs_mult=fixture_cs,
+            **fx_kwargs,
         )
         base_pts = expected_points_from_rates(
             base_rates,
             position,
             team_base_cs,
             appearance=1.0,
-            attack_mult=fixture_attack,
-            cs_mult=fixture_cs,
+            **fx_kwargs,
         )
 
         if form_apps <= 0:
@@ -775,7 +810,11 @@ def build_player_table(
             if team_base_cs is not None
             else (team_form_cs if team_form_cs is not None else (base_rates.get("cs_rate") or 0.0))
         )
-        cs_after_fixture = max(0.0, min(1.0, cs_raw * fixture_cs))
+        cs_after_fixture = blend_cs_probability(
+            cs_raw,
+            cs_mult=fixture_cs,
+            p_cs=fx_kwargs.get("p_cs"),
+        )
         saves_pa = float(show_rates.get("saves_pa") or base_rates.get("saves_pa") or 0.0)
         prior_saves_pa = float(prev_rates.get("saves_pa") or 0.0)
         current_saves_pa = float(
@@ -818,6 +857,11 @@ def build_player_table(
                         fixture_attack_mult=fixture_attack,
                         fixture_cs_mult=fixture_cs,
                         rating=float(show_rates.get("rating") or base_rates.get("rating") or 0.0),
+                        save_mult=float(fx_kwargs.get("save_mult") or 1.0),
+                        lambda_for=fx_kwargs.get("lambda_for"),
+                        lambda_against=fx_kwargs.get("lambda_against"),
+                        p_cs=fx_kwargs.get("p_cs"),
+                        team_goal_rate=fx_kwargs.get("team_goal_rate"),
                     )
                     projected = float(gk_pack["projected_pts"]) * recency_mult
                     saves_pa = float(gk_pack["saves_pa"])
@@ -825,9 +869,17 @@ def build_player_table(
                     w_saves_current = float(gk_pack["w_saves_current"])
                     base_pts = float(gk_pack["projected_pts"])
                 else:
-                    saves_contrib = (saves_pa / 3.0) * SAVE_POINTS_PER_3
+                    saves_contrib = (
+                        (saves_pa / 3.0)
+                        * SAVE_POINTS_PER_3
+                        * float(fx_kwargs.get("save_mult") or 1.0)
+                    )
             else:
-                saves_contrib = (saves_pa / 3.0) * SAVE_POINTS_PER_3
+                saves_contrib = (
+                    (saves_pa / 3.0)
+                    * SAVE_POINTS_PER_3
+                    * float(fx_kwargs.get("save_mult") or 1.0)
+                )
         else:
             saves_contrib = 0.0
 
@@ -883,6 +935,37 @@ def build_player_table(
         else:
             reason_bits.append(f"L6 katılım {form_apps:.0f}/{recent_matches:.0f}")
         reason_bits.append(f"blend {w_f:.0%}/{w_b:.0%} ({base_src})")
+        if fx_kwargs.get("lambda_for") is not None:
+            reason_bits.append(
+                f"maç modeli λ {float(fx_kwargs['lambda_for']):.2f}-"
+                f"{float(fx_kwargs.get('lambda_against') or 0):.2f} "
+                f"(CS P={float(fx_kwargs.get('p_cs') or 0):.0%})"
+            )
+
+        week_pts = [float(projected)]
+        for extra in fixture_horizon_list(fixture)[1:]:
+            extra_kwargs = fixture_model_kwargs(extra)
+            extra_form = expected_points_from_rates(
+                form_for_points,
+                position,
+                team_form_cs,
+                appearance=1.0,
+                **extra_kwargs,
+            )
+            extra_base = expected_points_from_rates(
+                base_rates,
+                position,
+                team_base_cs,
+                appearance=1.0,
+                **extra_kwargs,
+            )
+            extra_pts = (w_f * extra_form + w_b * extra_base) * recency_mult
+            if base_rates.get("min_per_app", 0) < 20 and form_rates.get("min_per_app", 0) < 20:
+                extra_pts *= 0.35
+            week_pts.append(float(extra_pts))
+        while len(week_pts) < 3:
+            week_pts.append(week_pts[-1] if week_pts else 0.0)
+        horizon_pts = weighted_horizon_points(week_pts)
 
         rows.append(
             {
@@ -932,6 +1015,14 @@ def build_player_table(
                 "fixture_home": fixture.get("home"),
                 "fixture_attack_mult": fixture_attack,
                 "fixture_cs_mult": fixture_cs,
+                "fixture_save_mult": round(float(fx_kwargs.get("save_mult") or 1.0), 4),
+                "fixture_lambda_for": fx_kwargs.get("lambda_for"),
+                "fixture_lambda_against": fx_kwargs.get("lambda_against"),
+                "fixture_p_cs": fx_kwargs.get("p_cs"),
+                "pts_week0": round(week_pts[0], 3),
+                "pts_week1": round(week_pts[1], 3),
+                "pts_week2": round(week_pts[2], 3),
+                "horizon_pts": round(horizon_pts, 3),
                 "fixture_cs_note": (
                     f"baz CS {cs_raw:.0%} × {fixture_cs:.2f} → {cs_after_fixture:.0%}"
                     if position in ("GK", "DF")
@@ -986,6 +1077,43 @@ def lookup_fixture_context(
         if score >= 0.5 and (best is None or score > best[0]):
             best = (score, value)
     return best[1] if best else {}
+
+
+def fixture_model_kwargs(fixture: dict[str, Any] | None) -> dict[str, Any]:
+    fx = fixture or {}
+    cs_mult = float(fx.get("cs_mult") or 1.0)
+    return {
+        "attack_mult": float(fx.get("attack_mult") or 1.0),
+        "cs_mult": max(FIXTURE_CS_FLOOR, min(FIXTURE_CS_CEILING, cs_mult)),
+        "save_mult": float(fx.get("save_mult") or 1.0),
+        "lambda_for": fx.get("lambda_for"),
+        "lambda_against": fx.get("lambda_against"),
+        "p_cs": fx.get("p_cs"),
+        "team_goal_rate": fx.get("team_goal_rate"),
+    }
+
+
+def fixture_horizon_list(fixture: dict[str, Any] | None) -> list[dict[str, Any]]:
+    fx = fixture or {}
+    horizon = fx.get("horizon")
+    if isinstance(horizon, list) and horizon:
+        return [item for item in horizon if isinstance(item, dict)]
+    if fx:
+        return [fx]
+    return [{}]
+
+
+def weighted_horizon_points(
+    week_pts: list[float],
+    weights: tuple[float, ...] = HORIZON_WEIGHTS,
+) -> float:
+    total_w = 0.0
+    total = 0.0
+    for idx, weight in enumerate(weights):
+        pts = float(week_pts[idx]) if idx < len(week_pts) else float(week_pts[-1] if week_pts else 0.0)
+        total += float(weight) * pts
+        total_w += float(weight)
+    return total / total_w if total_w else 0.0
 
 
 def availability_multiplier(status: str | None, percent: float | None = None) -> float:
@@ -1110,6 +1238,20 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
     play_probs = out.apply(estimate_play_probability, axis=1)
     out["play_probability"] = play_probs.round(3)
     out["projected_pts"] = (out["pts_if_plays"] * out["play_probability"]).round(3)
+    raw_week0 = pd.to_numeric(out.get("pts_week0", out["raw_pts"]), errors="coerce").fillna(
+        out["raw_pts"]
+    )
+    cal_ratio = (out["pts_if_plays"] / raw_week0.replace(0, pd.NA)).fillna(1.0)
+    week1 = pd.to_numeric(out.get("pts_week1", out["pts_if_plays"]), errors="coerce").fillna(
+        out["pts_if_plays"]
+    ) * cal_ratio
+    week2 = pd.to_numeric(out.get("pts_week2", out["pts_if_plays"]), errors="coerce").fillna(
+        out["pts_if_plays"]
+    ) * cal_ratio
+    w0, w1, w2 = HORIZON_WEIGHTS
+    horizon_if_plays = (w0 * out["pts_if_plays"] + w1 * week1 + w2 * week2) / (w0 + w1 + w2)
+    out["horizon_pts"] = horizon_if_plays.clip(lower=0.0).round(3)
+    out["selection_pts"] = (horizon_if_plays * out["play_probability"]).clip(lower=0.0).round(3)
     if "position" in out.columns:
         is_gk = out["position"].astype(str).str.upper().eq("GK")
         out["gk_play_prob"] = out["play_probability"].where(is_gk, pd.NA)
@@ -1152,6 +1294,10 @@ def apply_context_adjustments(df: pd.DataFrame) -> pd.DataFrame:
         play_p = float(row.get("play_probability") or 1.0)
         if play_p < 0.95 and str(row.get("position") or "").upper() != "GK":
             bits.append(f"oynama ~{play_p:.0%}")
+        h0 = float(row.get("pts_if_plays") or 0)
+        h1 = float(row.get("pts_week1") or h0)
+        if abs(h1 - h0) >= 0.25:
+            bits.append(f"3 hafta ufku {float(row.get('horizon_pts') or h0):.2f}p")
         if bits:
             extra = "; ".join(bits)
             return f"{reason} | {extra}" if reason else extra

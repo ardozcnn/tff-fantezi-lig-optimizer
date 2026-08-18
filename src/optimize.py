@@ -20,11 +20,18 @@ def _bench_of(
     return {pos: squad[pos] - xi[pos] for pos in squad}
 
 
-def _selection_value(row: pd.Series) -> float:
-    """ILP için lineer vekil: oynama × puan; yedek için daha düşük."""
+def _this_week_value(row: pd.Series) -> float:
     pts = float(row.get("pts_if_plays") or row.get("projected_pts") or 0.0)
     play = float(row.get("play_probability") or 0.85)
     return pts * max(0.05, min(1.0, play))
+
+
+def _selection_value(row: pd.Series) -> float:
+    """ILP kadro seçimi: 3 haftalık ufuk varsa onu, yoksa bu haftayı kullan."""
+    sel = row.get("selection_pts") if hasattr(row, "get") else None
+    if sel is not None and pd.notna(sel):
+        return float(sel)
+    return _this_week_value(row)
 
 
 def _sort_xi(frame: pd.DataFrame) -> pd.DataFrame:
@@ -351,7 +358,7 @@ def optimize_squad(
     autosub = best["autosub"]
     squad_df = pd.concat([xi_df, bn_df], ignore_index=True)
     total_cost = float(squad_df["price_m"].sum())
-    captain_row = xi_df.loc[xi_df.apply(_selection_value, axis=1).idxmax()]
+    captain_row = xi_df.loc[xi_df.apply(_this_week_value, axis=1).idxmax()]
     bench_shape = _bench_of(formations[chosen], squad)
 
     return {
